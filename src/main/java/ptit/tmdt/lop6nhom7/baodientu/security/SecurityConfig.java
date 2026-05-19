@@ -60,7 +60,7 @@ public class SecurityConfig {
 
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000", // Nuxt dev
-                "http://localhost:3001" // alternate port
+                "http://localhost:5173" // alternate port
         ));
 
         config.setAllowedMethods(List.of(
