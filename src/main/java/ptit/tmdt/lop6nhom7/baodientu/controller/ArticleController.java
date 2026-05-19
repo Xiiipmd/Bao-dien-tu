@@ -26,6 +26,5 @@ public class ArticleController {
     @PreAuthorize("hasRole('VIP')")
     public ResponseEntity<ArticleDTO> getAIArticleSummary(@RequestParam("articleId") int articleId) throws Exception {
         return ResponseEntity.ok(articleService.summarizeArticle(articleId));
-
     }
 }
