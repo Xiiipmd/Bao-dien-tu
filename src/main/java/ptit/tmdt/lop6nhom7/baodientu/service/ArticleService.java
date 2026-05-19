@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
+import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 import ptit.tmdt.lop6nhom7.baodientu.exception.NotFoundException;
 import ptit.tmdt.lop6nhom7.baodientu.repository.ArticleRepo;
 
@@ -68,7 +69,15 @@ public class ArticleService {
         if (chatResponse.equals("")) {
             throw new Exception("Không thể tóm tắt bài báo vào lúc này. Hãy thử lại sau");
         }
-        return ArticleDTO.builder().content(chatResponse).build();
+        return ArticleDTO.builder()
+            .authorId(0)
+            .categoryId(0)
+            .coverImage("dummy")
+            .title("AI Summary")
+            .sapo("AI summary")
+            .content(chatResponse)
+            .type(ArticleType.FREE)
+            .build();
     }
 
 }
