@@ -33,15 +33,18 @@ public class AuthService {
   private final ObjectMapper objectMapper;
   
   public @Nullable LoginRes login(@Valid LoginReq request) {
+    String email = request.getEmail().trim();
+    String password = request.getPassword().trim();
+
     // Find user
-    User u = userRepo.findByEmail(request.getEmail())
+    User u = userRepo.findByEmail(email)
         .orElseThrow(() -> new UnauthorizedException("Sai ten dang nhap hoac mat khau"));
     // Check status
     if (u.getStatus() == UserStatus.LOCKED) {
       throw new ForbiddenException("Nguoi dung bi khoa tai khoan");
     }
     // Verify password
-    if (!passwordEncoder.matches(request.getPassword(), u.getPasswordHash())) {
+    if (!passwordEncoder.matches(password, u.getPasswordHash())) {
       throw new UnauthorizedException("Sai ten dang nhap hoac mat khau");
     }
     // Generate JWT
@@ -51,20 +54,25 @@ public class AuthService {
   }
   
   public void register(RegisterReq request) {
+    String email = request.getEmail().trim();
+    String name = request.getName().trim();
+    String password = request.getPassword().trim();
+    String confirmation = request.getConfirmation().trim();
+
     //
-    if (!request.getPassword().equals(request.getConfirmation())) {
+    if (!password.equals(confirmation)) {
       throw new ConflictException("Passwords do not match");
     }
     // Check duplicate email
-    if (userRepo.existsByEmail(request.getEmail())) {
+    if (userRepo.existsByEmail(email)) {
       throw new ConflictException("Email already exists");
     }
     //
     User newUser = new User();
-    newUser.setEmail(request.getEmail());
-    newUser.setFullName(request.getName());
+    newUser.setEmail(email);
+    newUser.setFullName(name);
     newUser.setStatus(UserStatus.ACTIVE);
-    newUser.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+    newUser.setPasswordHash(passwordEncoder.encode(password));
     newUser.setRole(UserRole.MEMBER);
     newUser.setFreeArticlesLeft(3);
     newUser.setVipExpiryDate(Instant.now());

@@ -2,7 +2,6 @@ package ptit.tmdt.lop6nhom7.baodientu.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -11,6 +10,13 @@ public class LoginReq {
   @Email
   private String email;
   @NotBlank(message = "Password khong duoc bo trong")
-  @Size(min = 8, max = 24, message = "Mat khau phai tu 8 den 24 ki tu.")
   private String password;
+
+  public void setEmail(String email) {
+    this.email = email == null ? null : email.trim();
+  }
+
+  public void setPassword(String password) {
+    this.password = password == null ? null : password.trim();
+  }
 }

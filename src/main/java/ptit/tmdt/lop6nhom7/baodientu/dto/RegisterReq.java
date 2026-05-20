@@ -2,7 +2,6 @@ package ptit.tmdt.lop6nhom7.baodientu.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
@@ -12,14 +11,27 @@ public class RegisterReq {
   private String email;
   
   @NotBlank(message = "Ten khong duoc bo trong")
-  @Size(min = 1, max = 1024, message = "Do dai khong qua 1024.")
   private String name;
 
   @NotBlank(message = "Password khong duoc bo trong")
-  @Size(min = 8, max = 24, message = "Mat khau phai tu 8 den 24 ki tu.")
   private String password;
   
   @NotBlank(message = "Password khong duoc bo trong")
-  @Size(min = 8, max = 24, message = "Mat khau phai tu 8 den 24 ki tu.")
   private String confirmation;
+
+  public void setEmail(String email) {
+    this.email = email == null ? null : email.trim();
+  }
+
+  public void setName(String name) {
+    this.name = name == null ? null : name.trim();
+  }
+
+  public void setPassword(String password) {
+    this.password = password == null ? null : password.trim();
+  }
+
+  public void setConfirmation(String confirmation) {
+    this.confirmation = confirmation == null ? null : confirmation.trim();
+  }
 }
