@@ -33,3 +33,5 @@ build/
 .vscode/
 
 hs_err_pid14548.log
+
+*.pdf
