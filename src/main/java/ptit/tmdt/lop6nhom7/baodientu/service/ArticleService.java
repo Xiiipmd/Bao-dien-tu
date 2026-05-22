@@ -1,27 +1,51 @@
 package ptit.tmdt.lop6nhom7.baodientu.service;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.google.genai.Client;
 
-import io.micrometer.core.ipc.http.HttpSender.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticlePreviewResponse;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleReadResponse;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
+import ptit.tmdt.lop6nhom7.baodientu.entity.ArticleView;
+import ptit.tmdt.lop6nhom7.baodientu.entity.User;
+import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
+import ptit.tmdt.lop6nhom7.baodientu.enums.UserStatus;
+import ptit.tmdt.lop6nhom7.baodientu.exception.BadRequestException;
+import ptit.tmdt.lop6nhom7.baodientu.exception.ForbiddenException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.NotFoundException;
 import ptit.tmdt.lop6nhom7.baodientu.repository.ArticleRepo;
+import ptit.tmdt.lop6nhom7.baodientu.repository.ArticleViewRepo;
+import ptit.tmdt.lop6nhom7.baodientu.repository.UserRepo;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class ArticleService {
+    private static final int PREVIEW_PARAGRAPH_LIMIT = 2;
+    private static final int PREVIEW_CHARACTER_LIMIT = 700;
+    private static final int MONTHLY_FREE_VIP_ARTICLE_LIMIT = 3;
     
     private final ArticleRepo articleRepo;
+    private final ArticleViewRepo articleViewRepo;
+    private final UserRepo userRepo;
+    private final AnonymousReadMeterService anonymousReadMeterService;
     private final Client geminiClient = new Client();
     private final List<String> geminiModels = List.of(
         "gemini-3.1-pro-preview",
@@ -78,6 +102,199 @@ public class ArticleService {
             .content(chatResponse)
             .type(ArticleType.FREE)
             .build();
+    }
+
+    public ArticlePreviewResponse getVipArticlePreview(int articleId) {
+        Article article = articleRepo.findByIdAndStatus(articleId, ArticleStatus.PUBLISHED)
+            .orElseThrow(() -> new NotFoundException("Không tìm thấy bài báo đang xuất bản"));
+
+        if (article.getType() != ArticleType.VIP) {
+            throw new BadRequestException("Chức năng preview chỉ áp dụng cho bài viết VIP");
+        }
+
+        return ArticlePreviewResponse.builder()
+            .id(article.getId())
+            .title(article.getTitle())
+            .sapo(article.getSapo())
+            .coverImage(article.getCoverImage())
+            .previewContent(buildPreviewContent(article.getContent()))
+            .authorName(article.getAuthor().getFullName())
+            .categoryName(article.getCategory().getName())
+            .type(article.getType())
+            .paywallRequired(true)
+            .build();
+    }
+
+    @Transactional
+    public ArticleReadResponse readArticle(int articleId, String anonymousReaderKey) {
+        Article article = articleRepo.findByIdAndStatus(articleId, ArticleStatus.PUBLISHED)
+            .orElseThrow(() -> new NotFoundException("Không tìm thấy bài báo đang xuất bản"));
+
+        Optional<User> currentUser = getCurrentUser();
+        MeteredDecision meteredDecision = MeteredDecision.none();
+        boolean vipAccessGranted = false;
+
+        if (article.getType() == ArticleType.VIP) {
+            if (currentUser.isPresent() && hasActiveVip(currentUser.get())) {
+                vipAccessGranted = true;
+            } else {
+                meteredDecision = resolveMeteredAccess(article, currentUser, anonymousReaderKey);
+            }
+        }
+
+        recordView(article, currentUser.orElse(null));
+
+        return ArticleReadResponse.builder()
+            .id(article.getId())
+            .title(article.getTitle())
+            .sapo(article.getSapo())
+            .content(article.getContent())
+            .coverImage(article.getCoverImage())
+            .authorName(article.getAuthor().getFullName())
+            .categoryName(article.getCategory().getName())
+            .type(article.getType())
+            .viewCount(article.getViewCount())
+            .createdAt(article.getCreatedAt())
+            .vipAccessGranted(vipAccessGranted)
+            .meteredAccessApplied(meteredDecision.applied())
+            .remainingFreeReads(meteredDecision.remainingFreeReads())
+            .accessMessage(resolveAccessMessage(article.getType(), vipAccessGranted, meteredDecision))
+            .build();
+    }
+
+    private String buildPreviewContent(String content) {
+        if (content == null || content.isBlank()) {
+            return "";
+        }
+
+        List<String> paragraphs = Arrays.stream(content.split("\\R\\s*\\R"))
+            .map(String::trim)
+            .filter(part -> !part.isBlank())
+            .limit(PREVIEW_PARAGRAPH_LIMIT)
+            .collect(Collectors.toList());
+
+        String preview = paragraphs.isEmpty()
+            ? content.trim()
+            : String.join(System.lineSeparator() + System.lineSeparator(), paragraphs);
+
+        if (preview.length() > PREVIEW_CHARACTER_LIMIT) {
+            return preview.substring(0, PREVIEW_CHARACTER_LIMIT).trim() + "...";
+        }
+
+        if (!preview.equals(content.trim())) {
+            return preview + System.lineSeparator() + System.lineSeparator() + "...";
+        }
+
+        return preview;
+    }
+
+    private MeteredDecision resolveMeteredAccess(Article article, Optional<User> currentUser, String anonymousReaderKey) {
+        if (currentUser.isPresent()) {
+            User user = currentUser.get();
+            if (user.getStatus() == UserStatus.LOCKED) {
+                throw new ForbiddenException("Nguoi dung bi khoa tai khoan");
+            }
+
+            Instant startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay(ZoneId.systemDefault()).toInstant();
+            Instant now = Instant.now();
+            boolean alreadyRead = articleViewRepo.existsByUserIdAndArticleIdAndViewedAtBetween(
+                user.getId(),
+                article.getId(),
+                startOfMonth,
+                now
+            );
+            long usedReads = articleViewRepo.countDistinctArticlesByUserAndTypeWithinPeriod(
+                user.getId(),
+                ArticleType.VIP,
+                startOfMonth,
+                now
+            );
+
+            if (!alreadyRead && usedReads >= MONTHLY_FREE_VIP_ARTICLE_LIMIT) {
+                throw new ForbiddenException("Bạn đã hết lượt đọc miễn phí trong tháng. Hãy đăng ký VIP để tiếp tục đọc không giới hạn.");
+            }
+
+            int remaining = alreadyRead
+                ? Math.max(0, MONTHLY_FREE_VIP_ARTICLE_LIMIT - (int) usedReads)
+                : Math.max(0, MONTHLY_FREE_VIP_ARTICLE_LIMIT - (int) usedReads - 1);
+            user.setFreeArticlesLeft(remaining);
+            userRepo.save(user);
+            return MeteredDecision.metered(remaining, !alreadyRead);
+        }
+
+        AnonymousReadMeterService.MeteredAccessResult result = anonymousReadMeterService.consumeRead(
+            normalizeAnonymousReaderKey(anonymousReaderKey),
+            article.getId()
+        );
+        if (!result.allowed()) {
+            throw new ForbiddenException("Bạn đã hết lượt đọc miễn phí trong tháng. Hãy đăng ký VIP để tiếp tục đọc không giới hạn.");
+        }
+
+        return MeteredDecision.metered(result.remainingReads(), result.newlyConsumed());
+    }
+
+    private void recordView(Article article, User user) {
+        ArticleView articleView = new ArticleView();
+        articleView.setArticle(article);
+        articleView.setUser(user);
+        articleView.setViewedAt(Instant.now());
+        articleViewRepo.save(articleView);
+
+        article.setViewCount((article.getViewCount() == null ? 0 : article.getViewCount()) + 1);
+        articleRepo.save(article);
+    }
+
+    private Optional<User> getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || "anonymousUser".equals(authentication.getName())) {
+            return Optional.empty();
+        }
+
+        try {
+            Integer userId = Integer.valueOf(authentication.getName());
+            return userRepo.findById(userId);
+        } catch (NumberFormatException ex) {
+            log.debug("Skipping authenticated reader resolution because principal is not numeric: {}", authentication.getName());
+            return Optional.empty();
+        }
+    }
+
+    private boolean hasActiveVip(User user) {
+        return user.getStatus() != UserStatus.LOCKED
+            && user.getVipExpiryDate() != null
+            && user.getVipExpiryDate().isAfter(Instant.now());
+    }
+
+    private String resolveAccessMessage(ArticleType articleType, boolean vipAccessGranted, MeteredDecision meteredDecision) {
+        if (articleType == ArticleType.FREE) {
+            return "Bài báo này không giới hạn lượt đọc.";
+        }
+        if (vipAccessGranted) {
+            return "Bạn đang đọc bài báo với quyền VIP không giới hạn.";
+        }
+        if (meteredDecision.applied()) {
+            return meteredDecision.newlyConsumed()
+                ? "Bạn vừa sử dụng 1 lượt đọc miễn phí. Bạn vẫn có thể tiếp tục đọc trong hạn mức tháng này."
+                : "Bài viết này đã được tính trong hạn mức miễn phí của bạn trong tháng này.";
+        }
+        return null;
+    }
+
+    private String normalizeAnonymousReaderKey(String anonymousReaderKey) {
+        if (anonymousReaderKey == null || anonymousReaderKey.isBlank()) {
+            return UUID.randomUUID().toString();
+        }
+        return anonymousReaderKey;
+    }
+
+    private record MeteredDecision(boolean applied, Integer remainingFreeReads, boolean newlyConsumed) {
+        private static MeteredDecision none() {
+            return new MeteredDecision(false, null, false);
+        }
+
+        private static MeteredDecision metered(int remainingFreeReads, boolean newlyConsumed) {
+            return new MeteredDecision(true, remainingFreeReads, newlyConsumed);
+        }
     }
 
 }

@@ -11,10 +11,32 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import ptit.tmdt.lop6nhom7.baodientu.entity.ArticleView;
+import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 
 @Repository
 public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
+    boolean existsByUserIdAndArticleIdAndViewedAtBetween(
+        Integer userId,
+        Integer articleId,
+        Instant startDate,
+        Instant endDate
+    );
+
+    @Query("""
+        select count(distinct av.article.id)
+        from ArticleView av
+        where av.user.id = :userId
+            and av.article.type = :articleType
+            and av.viewedAt between :startDate and :endDate
+        """)
+    long countDistinctArticlesByUserAndTypeWithinPeriod(
+        @Param("userId") Integer userId,
+        @Param("articleType") ArticleType articleType,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate
+    );
+
     long countByArticleAuthorIdAndArticleStatusAndViewedAtBetween(
         Integer authorId,
         ArticleStatus status,
