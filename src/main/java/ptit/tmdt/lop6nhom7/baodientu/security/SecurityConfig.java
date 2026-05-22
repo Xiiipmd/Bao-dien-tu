@@ -34,6 +34,8 @@ public class SecurityConfig {
                         .requestMatchers("/v3/api-docs/**").permitAll()
                         .requestMatchers("/swagger/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/articles/*/preview").permitAll()
+                        .requestMatchers("/api/articles/*/read").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
                         .requestMatchers("/api/transactions/vnpay-return").permitAll()
                         .requestMatchers("/api/transactions/vnpay-ipn").permitAll()
