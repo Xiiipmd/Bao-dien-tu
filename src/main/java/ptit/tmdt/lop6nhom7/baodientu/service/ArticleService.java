@@ -149,7 +149,11 @@ public class ArticleService {
         boolean vipAccessGranted = false;
 
         if (article.getType() == ArticleType.VIP) {
-            if (currentUser.isPresent() && hasActiveVip(currentUser.get())) {
+            if (currentUser.isEmpty()) {
+                throw new ForbiddenException("Vui lòng đăng nhập để sử dụng lượt đọc miễn phí hoặc đăng ký VIP để đọc toàn bộ bài viết này.");
+            }
+
+            if (hasActiveVip(currentUser.get())) {
                 vipAccessGranted = true;
             } else {
                 meteredDecision = resolveMeteredAccess(article, currentUser, anonymousReaderKey);
