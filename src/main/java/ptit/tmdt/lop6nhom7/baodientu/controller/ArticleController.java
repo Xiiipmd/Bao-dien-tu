@@ -16,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticlePreviewResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleReadResponse;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleSearchResponse;
 import ptit.tmdt.lop6nhom7.baodientu.service.AnonymousReadMeterService;
 import ptit.tmdt.lop6nhom7.baodientu.service.ArticleService;
 
@@ -42,6 +43,15 @@ public class ArticleController {
         HttpServletResponse response
     ) {
         return ResponseEntity.ok(articleService.readArticle(articleId, resolveReaderKey(request, response)));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<java.util.List<ArticleSearchResponse>> searchArticles(
+        @RequestParam(value = "keyword", required = false) String keyword,
+        @RequestParam(value = "categoryId", required = false) Integer categoryId,
+        @RequestParam(value = "authorName", required = false) String authorName
+    ) {
+        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorName));
     }
 
     @GetMapping("/summary")

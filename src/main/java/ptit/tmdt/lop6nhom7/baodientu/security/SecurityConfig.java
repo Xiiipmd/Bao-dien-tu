@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -36,6 +37,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/articles/*/preview").permitAll()
                         .requestMatchers("/api/articles/*/read").permitAll()
+                        .requestMatchers("/api/articles/search").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/articles/*/comments").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
                         .requestMatchers("/api/transactions/vnpay-return").permitAll()
                         .requestMatchers("/api/transactions/vnpay-ipn").permitAll()
