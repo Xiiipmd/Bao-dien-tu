@@ -131,6 +131,11 @@ public class StaffArticleService {
         article.setContent(request.getContent().trim());
         article.setType(request.getType());
 
+        if (article.getStatus() == ArticleStatus.REJECTED) {
+            article.setStatus(ArticleStatus.PENDING);
+            article.setRejectionReason(null);
+        }
+
         Article savedArticle = articleRepo.save(article);
         return toDto(savedArticle);
     }

@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Builder;
 import lombok.Data;
+import lombok.AllArgsConstructor;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Category;
 import ptit.tmdt.lop6nhom7.baodientu.entity.User;
@@ -15,6 +16,7 @@ import java.time.Instant;
 
 @Data
 @Builder
+@AllArgsConstructor
 public class ArticleDTO {
 	private Integer id;
 	@NotNull
