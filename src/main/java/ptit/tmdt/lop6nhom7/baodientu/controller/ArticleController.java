@@ -55,7 +55,7 @@ public class ArticleController {
     }
 
     @GetMapping("/summary")
-    @PreAuthorize("hasRole('VIP')")
+    @PreAuthorize("hasAnyRole('VIP', 'ADMIN')")
     public ResponseEntity<ArticleDTO> getAIArticleSummary(@RequestParam("articleId") int articleId) throws Exception {
         return ResponseEntity.ok(articleService.summarizeArticle(articleId));
     }
