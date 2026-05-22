@@ -21,6 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticlePreviewResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleReadResponse;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleSearchResponse;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
 import ptit.tmdt.lop6nhom7.baodientu.entity.ArticleView;
 import ptit.tmdt.lop6nhom7.baodientu.entity.User;
@@ -124,6 +125,19 @@ public class ArticleService {
             .paywallRequired(true)
             .build();
     }
+
+            @Transactional(readOnly = true)
+            public List<ArticleSearchResponse> searchArticles(String keyword, Integer categoryId, String authorName) {
+            return articleRepo.searchPublishedArticles(
+                ArticleStatus.PUBLISHED,
+                normalizeQueryParam(keyword),
+                categoryId,
+                normalizeQueryParam(authorName)
+                )
+                .stream()
+                .map(this::toSearchResponse)
+                .toList();
+            }
 
     @Transactional
     public ArticleReadResponse readArticle(int articleId, String anonymousReaderKey) {
@@ -285,6 +299,27 @@ public class ArticleService {
             return UUID.randomUUID().toString();
         }
         return anonymousReaderKey;
+    }
+
+    private String normalizeQueryParam(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private ArticleSearchResponse toSearchResponse(Article article) {
+        return ArticleSearchResponse.builder()
+            .id(article.getId())
+            .title(article.getTitle())
+            .sapo(article.getSapo())
+            .coverImage(article.getCoverImage())
+            .authorName(article.getAuthor().getFullName())
+            .categoryName(article.getCategory().getName())
+            .type(article.getType())
+            .createdAt(article.getCreatedAt())
+            .build();
     }
 
     private record MeteredDecision(boolean applied, Integer remainingFreeReads, boolean newlyConsumed) {
