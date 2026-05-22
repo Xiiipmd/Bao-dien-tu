@@ -14,6 +14,8 @@ import java.util.Optional;
 public interface ArticleRepo extends JpaRepository<Article, Integer> {
   Optional<Article> findByIdAndStatus(Integer id, ArticleStatus status);
   List<Article> findByStatusOrderByCreatedAtDesc(ArticleStatus status);
+  List<Article> findByStatusInOrderByCreatedAtDesc(List<ArticleStatus> statuses);
+  List<Article> findByStatusInAndTitleContainingIgnoreCaseOrderByCreatedAtDesc(List<ArticleStatus> statuses, String title);
   List<Article> findAllByOrderByCreatedAtDesc();
   List<Article> findByTitleContainingIgnoreCaseOrderByCreatedAtDesc(String title);
   List<Article> findByAuthorIdOrderByCreatedAtDesc(Integer authorId);

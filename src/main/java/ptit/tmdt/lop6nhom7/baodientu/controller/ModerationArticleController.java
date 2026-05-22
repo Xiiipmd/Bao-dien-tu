@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestParam;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ModerateArticleDecisionRequest;
 import ptit.tmdt.lop6nhom7.baodientu.service.ModerationArticleService;
@@ -31,11 +32,26 @@ public class ModerationArticleController {
     return ResponseEntity.ok(moderationArticleService.getPendingArticles());
   }
 
+  @GetMapping("/visibility")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<List<ArticleDTO>> getVisibilityManagedArticles(
+      @RequestParam(value = "q", required = false) String keyword) {
+    log.info("Fetching visibility-managed articles keyword={}", keyword);
+    return ResponseEntity.ok(moderationArticleService.getVisibilityManagedArticles(keyword));
+  }
+
   @GetMapping("/{articleId}")
   @PreAuthorize("hasAnyRole('CENSOR', 'ADMIN')")
   public ResponseEntity<ArticleDTO> getPendingArticleDetail(@PathVariable Integer articleId) {
     log.info("Fetching pending article detail articleId={}", articleId);
     return ResponseEntity.ok(moderationArticleService.getPendingArticleDetail(articleId));
+  }
+
+  @GetMapping("/{articleId}/visibility")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ArticleDTO> getVisibilityManagedArticleDetail(@PathVariable Integer articleId) {
+    log.info("Fetching visibility-managed article detail articleId={}", articleId);
+    return ResponseEntity.ok(moderationArticleService.getVisibilityManagedArticleDetail(articleId));
   }
 
   @PostMapping("/{articleId}/decision")
@@ -45,5 +61,19 @@ public class ModerationArticleController {
       @Valid @RequestBody ModerateArticleDecisionRequest request) {
     log.info("Moderating articleId={} approved={}", articleId, request.isApproved());
     return ResponseEntity.ok(moderationArticleService.moderateArticle(articleId, request));
+  }
+
+  @PostMapping("/{articleId}/hide")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ArticleDTO> hideArticle(@PathVariable Integer articleId) {
+    log.info("Hiding articleId={}", articleId);
+    return ResponseEntity.ok(moderationArticleService.hideArticle(articleId));
+  }
+
+  @PostMapping("/{articleId}/show")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ArticleDTO> restoreArticle(@PathVariable Integer articleId) {
+    log.info("Restoring hidden articleId={}", articleId);
+    return ResponseEntity.ok(moderationArticleService.restoreArticle(articleId));
   }
 }
