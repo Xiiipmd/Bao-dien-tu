@@ -2,6 +2,7 @@ package ptit.tmdt.lop6nhom7.baodientu.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
@@ -24,6 +25,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class NewArticleEmailNotificationService {
   private final SubscriptionRepo subscriptionRepo;
   private final ObjectProvider<JavaMailSender> mailSenderProvider;
+  @Value("${spring.mail.username:}")
+  private String fromAddress;
 
   @Transactional(readOnly = true)
   public int notifySubscribersAboutNewArticle(Article article) {
@@ -39,6 +42,9 @@ public class NewArticleEmailNotificationService {
     AtomicInteger sentCount = new AtomicInteger();
     recipients.forEach((email, subscription) -> {
       SimpleMailMessage message = new SimpleMailMessage();
+      if (fromAddress != null && !fromAddress.isBlank()) {
+        message.setFrom(fromAddress);
+      }
       message.setTo(email);
       message.setSubject("Bao dien tu co bai viet moi: " + article.getTitle());
       message.setText("""
