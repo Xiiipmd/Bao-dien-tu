@@ -10,6 +10,18 @@ spring:
     username: ${TMDT_DB_USERNAME:root}
     password: ${TMDT_DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${TMDT_MAIL_USERNAME}
+    password: ${TMDT_MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 
   
 logging:
