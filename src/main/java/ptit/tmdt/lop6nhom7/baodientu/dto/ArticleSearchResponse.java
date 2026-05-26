@@ -13,6 +13,7 @@ public class ArticleSearchResponse {
   private String title;
   private String sapo;
   private String coverImage;
+  private Integer authorId;
   private String authorName;
   private String categoryName;
   private ArticleType type;

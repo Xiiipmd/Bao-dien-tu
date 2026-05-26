@@ -15,6 +15,7 @@ public class ArticleReadResponse {
   private String content;
   private String coverImage;
   private String authorName;
+  private Integer authorId;
   private String categoryName;
   private ArticleType type;
   private Integer viewCount;
