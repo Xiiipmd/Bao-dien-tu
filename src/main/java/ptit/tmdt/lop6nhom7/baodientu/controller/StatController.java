@@ -24,9 +24,10 @@ public class StatController {
     public ResponseEntity<AuthorStatDTO> getAuthorStat(
         @RequestParam int authorId,
         @RequestParam String startDate,
-        @RequestParam String endDate
+        @RequestParam String endDate,
+        @RequestParam(defaultValue = "day") String groupBy
     ) {
-        return ResponseEntity.ok(statService.getAuthorStat(authorId, startDate, endDate));
+        return ResponseEntity.ok(statService.getAuthorStat(authorId, startDate, endDate, groupBy));
     }
 
 }

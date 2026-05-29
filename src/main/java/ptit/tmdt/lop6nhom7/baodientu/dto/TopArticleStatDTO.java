@@ -13,5 +13,7 @@ public class TopArticleStatDTO {
     private Integer articleId;
     private String title;
     private Instant publishedAt;
+    private String articleType;
     private Long views;
+    private Long revenue;
 }

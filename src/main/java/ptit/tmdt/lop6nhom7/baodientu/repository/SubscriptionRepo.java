@@ -23,4 +23,9 @@ public interface SubscriptionRepo extends JpaRepository<Subscription, Integer> {
       SubscriptionTargetType targetType,
       Integer targetId
   );
+
+  long countByTargetTypeAndTargetId(
+      SubscriptionTargetType targetType,
+      Integer targetId
+  );
 }

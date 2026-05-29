@@ -43,4 +43,28 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       Instant startDate,
       Instant endDate
   );
+
+  @Query("""
+      select a.category.id as categoryId,
+          a.category.name as categoryName,
+          count(a) as articles
+      from Article a
+      where a.author.id = :authorId
+        and a.status = :status
+        and a.createdAt between :startDate and :endDate
+      group by a.category.id, a.category.name
+      order by count(a) desc, a.category.name asc
+      """)
+  List<TopicArticleCount> countPublishedArticlesByTopic(
+      @Param("authorId") Integer authorId,
+      @Param("status") ArticleStatus status,
+      @Param("startDate") Instant startDate,
+      @Param("endDate") Instant endDate
+  );
+
+  interface TopicArticleCount {
+    Integer getCategoryId();
+    String getCategoryName();
+    Long getArticles();
+  }
 }

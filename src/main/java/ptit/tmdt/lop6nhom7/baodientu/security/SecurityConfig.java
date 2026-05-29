@@ -68,7 +68,9 @@ public class SecurityConfig {
 
         config.setAllowedOrigins(List.of(
                 "http://localhost:3000", // Nuxt dev
-                "http://localhost:5173" // alternate port
+                "http://localhost:5173", // Vite dev
+                "http://127.0.0.1:3000",
+                "http://127.0.0.1:5173"
         ));
 
         config.setAllowedMethods(List.of(
