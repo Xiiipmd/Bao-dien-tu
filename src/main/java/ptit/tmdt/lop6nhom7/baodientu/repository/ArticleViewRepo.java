@@ -111,6 +111,107 @@ public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
         @Param("vipRate") Long vipRate
     );
 
+    @Query(value = """
+        select date_format(av.viewed_at, :periodFormat) as period,
+            count(*) as views,
+            sum(case when a.type = 'VIP' then :vipRate else :freeRate end) as revenue
+        from article_views av
+        join articles a on a.id = av.article_id
+        where a.status = :status
+            and (:authorId is null or a.author_id = :authorId)
+            and (:categoryId is null or a.category_id = :categoryId)
+            and av.viewed_at between :startDate and :endDate
+        group by date_format(av.viewed_at, :periodFormat)
+        order by min(av.viewed_at)
+        """, nativeQuery = true)
+    List<ViewRevenuePoint> findAdminViewRevenuePoints(
+        @Param("authorId") Integer authorId,
+        @Param("categoryId") Integer categoryId,
+        @Param("status") String status,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate,
+        @Param("periodFormat") String periodFormat,
+        @Param("freeRate") Long freeRate,
+        @Param("vipRate") Long vipRate
+    );
+
+    @Query(value = """
+        select date_format(av.viewed_at, :periodFormat) as period,
+            a.author_id as authorId,
+            u.full_name as authorName,
+            a.category_id as categoryId,
+            c.name as categoryName,
+            count(distinct a.id) as articles,
+            count(*) as views,
+            sum(case when a.type = 'VIP' then :vipRate else :freeRate end) as revenue
+        from article_views av
+        join articles a on a.id = av.article_id
+        join users u on u.id = a.author_id
+        join categories c on c.id = a.category_id
+        where a.status = :status
+            and (:authorId is null or a.author_id = :authorId)
+            and (:categoryId is null or a.category_id = :categoryId)
+            and av.viewed_at between :startDate and :endDate
+        group by date_format(av.viewed_at, :periodFormat),
+            a.author_id,
+            u.full_name,
+            a.category_id,
+            c.name
+        order by min(av.viewed_at), u.full_name asc, c.name asc
+        """, nativeQuery = true)
+    List<AdminStatDetail> findAdminStatDetails(
+        @Param("authorId") Integer authorId,
+        @Param("categoryId") Integer categoryId,
+        @Param("status") String status,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate,
+        @Param("periodFormat") String periodFormat,
+        @Param("freeRate") Long freeRate,
+        @Param("vipRate") Long vipRate
+    );
+
+    @Query(value = """
+        select u.id as targetId,
+            u.full_name as targetName,
+            count(distinct a.id) as articles,
+            count(*) as views,
+            sum(case when a.type = 'VIP' then :vipRate else :freeRate end) as revenue
+        from article_views av
+        join articles a on a.id = av.article_id
+        join users u on u.id = a.author_id
+        where a.status = :status
+            and av.viewed_at between :startDate and :endDate
+        group by u.id, u.full_name
+        """, nativeQuery = true)
+    List<AdminTopStat> findTopAuthorsForAdmin(
+        @Param("status") String status,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate,
+        @Param("freeRate") Long freeRate,
+        @Param("vipRate") Long vipRate
+    );
+
+    @Query(value = """
+        select c.id as targetId,
+            c.name as targetName,
+            count(distinct a.id) as articles,
+            count(*) as views,
+            sum(case when a.type = 'VIP' then :vipRate else :freeRate end) as revenue
+        from article_views av
+        join articles a on a.id = av.article_id
+        join categories c on c.id = a.category_id
+        where a.status = :status
+            and av.viewed_at between :startDate and :endDate
+        group by c.id, c.name
+        """, nativeQuery = true)
+    List<AdminTopStat> findTopCategoriesForAdmin(
+        @Param("status") String status,
+        @Param("startDate") Instant startDate,
+        @Param("endDate") Instant endDate,
+        @Param("freeRate") Long freeRate,
+        @Param("vipRate") Long vipRate
+    );
+
     interface TopArticleView {
         Integer getArticleId();
         String getTitle();
@@ -131,6 +232,25 @@ public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
         Long getViews();
         Long getFreeViews();
         Long getVipViews();
+        Long getRevenue();
+    }
+
+    interface AdminStatDetail {
+        String getPeriod();
+        Integer getAuthorId();
+        String getAuthorName();
+        Integer getCategoryId();
+        String getCategoryName();
+        Long getArticles();
+        Long getViews();
+        Long getRevenue();
+    }
+
+    interface AdminTopStat {
+        Integer getTargetId();
+        String getTargetName();
+        Long getArticles();
+        Long getViews();
         Long getRevenue();
     }
 }

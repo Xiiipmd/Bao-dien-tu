@@ -45,6 +45,22 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
   );
 
   @Query("""
+      select count(a)
+      from Article a
+      where a.status = :status
+        and (:authorId is null or a.author.id = :authorId)
+        and (:categoryId is null or a.category.id = :categoryId)
+        and a.createdAt between :startDate and :endDate
+      """)
+  long countPublishedArticlesForAdminStats(
+      @Param("authorId") Integer authorId,
+      @Param("categoryId") Integer categoryId,
+      @Param("status") ArticleStatus status,
+      @Param("startDate") Instant startDate,
+      @Param("endDate") Instant endDate
+  );
+
+  @Query("""
       select a.category.id as categoryId,
           a.category.name as categoryName,
           count(a) as articles
