@@ -13,6 +13,11 @@ public class AuthorStatDTO {
 	private Long totalArticles;
 	private Long totalViews;
 	private Long totalRevenue;
+	private Long totalFollowers;
+	private String periodUnit;
+	private Long freeViewPrice;
+	private Long vipViewPrice;
 	private List<AuthorStatPointDTO> chart;
 	private List<TopArticleStatDTO> topArticles;
+	private List<TopicStatDTO> topicStats;
 }
