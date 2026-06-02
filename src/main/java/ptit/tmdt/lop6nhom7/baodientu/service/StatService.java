@@ -3,9 +3,13 @@ package ptit.tmdt.lop6nhom7.baodientu.service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.time.YearMonth;
+import java.time.ZonedDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -13,6 +17,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -24,6 +29,7 @@ import lombok.extern.slf4j.Slf4j;
 import ptit.tmdt.lop6nhom7.baodientu.dto.AdminOverviewStatDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.AdminStatDetailDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.AdminTopStatDTO;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleStatDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.AuthorStatDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.AuthorStatPointDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.StatOptionDTO;
@@ -73,86 +79,80 @@ public class StatService {
         Instant endInstant = end.atTime(LocalTime.MAX).atZone(ZONE_ID).toInstant();
 
         long totalArticles = articleRepo.countByAuthorIdAndStatusAndCreatedAtBetween(
-            authorId,
-            ArticleStatus.PUBLISHED,
-            startInstant,
-            endInstant
-        );
-        long totalViews = articleViewRepo.countByArticleAuthorIdAndArticleStatusAndViewedAtBetween(
-            authorId,
-            ArticleStatus.PUBLISHED,
-            startInstant,
-            endInstant
-        );
-        long totalFollowers = subscriptionRepo.countByTargetTypeAndTargetId(
-            SubscriptionTargetType.AUTHOR,
-            authorId
-        );
-
-        List<AuthorStatPointDTO> chart = articleViewRepo
-            .findViewRevenuePoints(
-                authorId,
-                ArticleStatus.PUBLISHED.name(),
-                startInstant,
-                endInstant,
-                periodUnit.getMysqlDateFormat(),
-                FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            )
-            .stream()
-            .map(item -> AuthorStatPointDTO.builder()
-                .date(item.getPeriod())
-                .views(safeLong(item.getViews()))
-                .revenue(safeLong(item.getRevenue()))
-                .build())
-            .toList();
-
-        List<TopicStatDTO> topicStats = buildTopicStats(authorId, startInstant, endInstant);
-        long totalRevenue = topicStats.stream()
-            .mapToLong(item -> safeLong(item.getRevenue()))
-            .sum();
-
-        List<TopArticleStatDTO> topArticles = articleViewRepo
-            .findTopArticlesByAuthor(
                 authorId,
                 ArticleStatus.PUBLISHED,
                 startInstant,
-                endInstant,
-                PageRequest.of(0, TOP_ARTICLE_LIMIT)
-            )
-            .stream()
-            .map(item -> TopArticleStatDTO.builder()
-                .articleId(item.getArticleId())
-                .title(item.getTitle())
-                .publishedAt(item.getCreatedAt())
-                .articleType(item.getArticleType() == null ? null : item.getArticleType().name())
-                .views(safeLong(item.getViews()))
-                .revenue(safeLong(item.getViews()) * revenueRate(item.getArticleType()))
-                .build())
-            .toList();
+                endInstant);
+        long totalViews = articleViewRepo.countByArticleAuthorIdAndArticleStatusAndViewedAtBetween(
+                authorId,
+                ArticleStatus.PUBLISHED,
+                startInstant,
+                endInstant);
+        long totalFollowers = subscriptionRepo.countByTargetTypeAndTargetId(
+                SubscriptionTargetType.AUTHOR,
+                authorId);
+
+        List<AuthorStatPointDTO> chart = articleViewRepo
+                .findViewRevenuePoints(
+                        authorId,
+                        ArticleStatus.PUBLISHED.name(),
+                        startInstant,
+                        endInstant,
+                        periodUnit.getMysqlDateFormat(),
+                        FREE_REVENUE_PER_VIEW,
+                        VIP_REVENUE_PER_VIEW)
+                .stream()
+                .map(item -> AuthorStatPointDTO.builder()
+                        .date(item.getPeriod())
+                        .views(safeLong(item.getViews()))
+                        .revenue(safeLong(item.getRevenue()))
+                        .build())
+                .toList();
+
+        List<TopicStatDTO> topicStats = buildTopicStats(authorId, startInstant, endInstant);
+        long totalRevenue = topicStats.stream()
+                .mapToLong(item -> safeLong(item.getRevenue()))
+                .sum();
+
+        List<TopArticleStatDTO> topArticles = articleViewRepo
+                .findTopArticlesByAuthor(
+                        authorId,
+                        ArticleStatus.PUBLISHED,
+                        startInstant,
+                        endInstant,
+                        PageRequest.of(0, TOP_ARTICLE_LIMIT))
+                .stream()
+                .map(item -> TopArticleStatDTO.builder()
+                        .articleId(item.getArticleId())
+                        .title(item.getTitle())
+                        .publishedAt(item.getCreatedAt())
+                        .articleType(item.getArticleType() == null ? null : item.getArticleType().name())
+                        .views(safeLong(item.getViews()))
+                        .revenue(safeLong(item.getViews()) * revenueRate(item.getArticleType()))
+                        .build())
+                .toList();
 
         return AuthorStatDTO.builder()
-            .totalArticles(totalArticles)
-            .totalViews(totalViews)
-            .totalRevenue(totalRevenue)
-            .totalFollowers(totalFollowers)
-            .periodUnit(periodUnit.getApiValue())
-            .freeViewPrice(FREE_REVENUE_PER_VIEW)
-            .vipViewPrice(VIP_REVENUE_PER_VIEW)
-            .chart(chart)
-            .topArticles(topArticles)
-            .topicStats(topicStats)
-            .build();
+                .totalArticles(totalArticles)
+                .totalViews(totalViews)
+                .totalRevenue(totalRevenue)
+                .totalFollowers(totalFollowers)
+                .periodUnit(periodUnit.getApiValue())
+                .freeViewPrice(FREE_REVENUE_PER_VIEW)
+                .vipViewPrice(VIP_REVENUE_PER_VIEW)
+                .chart(chart)
+                .topArticles(topArticles)
+                .topicStats(topicStats)
+                .build();
     }
 
     @Transactional(readOnly = true)
     public AdminOverviewStatDTO getAdminOverviewStat(
-        Integer authorId,
-        Integer categoryId,
-        String startDate,
-        String endDate,
-        String groupBy
-    ) {
+            Integer authorId,
+            Integer categoryId,
+            String startDate,
+            String endDate,
+            String groupBy) {
         LocalDate start = parseDate(startDate);
         LocalDate end = parseDate(endDate);
         StatPeriodUnit periodUnit = parsePeriodUnit(groupBy);
@@ -164,78 +164,74 @@ public class StatService {
         Instant endInstant = end.atTime(LocalTime.MAX).atZone(ZONE_ID).toInstant();
 
         List<AuthorStatPointDTO> chart = articleViewRepo
-            .findAdminViewRevenuePoints(
-                normalizedAuthorId,
-                normalizedCategoryId,
-                ArticleStatus.PUBLISHED.name(),
-                startInstant,
-                endInstant,
-                periodUnit.getMysqlDateFormat(),
-                FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            )
-            .stream()
-            .map(item -> AuthorStatPointDTO.builder()
-                .date(item.getPeriod())
-                .views(safeLong(item.getViews()))
-                .revenue(safeLong(item.getRevenue()))
-                .build())
-            .toList();
+                .findAdminViewRevenuePoints(
+                        normalizedAuthorId,
+                        normalizedCategoryId,
+                        ArticleStatus.PUBLISHED.name(),
+                        startInstant,
+                        endInstant,
+                        periodUnit.getMysqlDateFormat(),
+                        FREE_REVENUE_PER_VIEW,
+                        VIP_REVENUE_PER_VIEW)
+                .stream()
+                .map(item -> AuthorStatPointDTO.builder()
+                        .date(item.getPeriod())
+                        .views(safeLong(item.getViews()))
+                        .revenue(safeLong(item.getRevenue()))
+                        .build())
+                .toList();
 
         List<AdminStatDetailDTO> details = articleViewRepo
-            .findAdminStatDetails(
-                normalizedAuthorId,
-                normalizedCategoryId,
-                ArticleStatus.PUBLISHED.name(),
-                startInstant,
-                endInstant,
-                periodUnit.getMysqlDateFormat(),
-                FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            )
-            .stream()
-            .map(item -> AdminStatDetailDTO.builder()
-                .period(item.getPeriod())
-                .authorId(item.getAuthorId())
-                .authorName(item.getAuthorName())
-                .categoryId(item.getCategoryId())
-                .categoryName(item.getCategoryName())
-                .articles(safeLong(item.getArticles()))
-                .views(safeLong(item.getViews()))
-                .revenue(safeLong(item.getRevenue()))
-                .build())
-            .toList();
+                .findAdminStatDetails(
+                        normalizedAuthorId,
+                        normalizedCategoryId,
+                        ArticleStatus.PUBLISHED.name(),
+                        startInstant,
+                        endInstant,
+                        periodUnit.getMysqlDateFormat(),
+                        FREE_REVENUE_PER_VIEW,
+                        VIP_REVENUE_PER_VIEW)
+                .stream()
+                .map(item -> AdminStatDetailDTO.builder()
+                        .period(item.getPeriod())
+                        .authorId(item.getAuthorId())
+                        .authorName(item.getAuthorName())
+                        .categoryId(item.getCategoryId())
+                        .categoryName(item.getCategoryName())
+                        .articles(safeLong(item.getArticles()))
+                        .views(safeLong(item.getViews()))
+                        .revenue(safeLong(item.getRevenue()))
+                        .build())
+                .toList();
 
         long totalArticles = articleRepo.countPublishedArticlesForAdminStats(
-            normalizedAuthorId,
-            normalizedCategoryId,
-            ArticleStatus.PUBLISHED,
-            startInstant,
-            endInstant
-        );
+                normalizedAuthorId,
+                normalizedCategoryId,
+                ArticleStatus.PUBLISHED,
+                startInstant,
+                endInstant);
         long totalViews = chart.stream().mapToLong(point -> safeLong(point.getViews())).sum();
         long totalRevenue = chart.stream().mapToLong(point -> safeLong(point.getRevenue())).sum();
 
         return AdminOverviewStatDTO.builder()
-            .totalArticles(totalArticles)
-            .totalViews(totalViews)
-            .totalRevenue(totalRevenue)
-            .periodUnit(periodUnit.getApiValue())
-            .freeViewPrice(FREE_REVENUE_PER_VIEW)
-            .vipViewPrice(VIP_REVENUE_PER_VIEW)
-            .chart(chart)
-            .details(details)
-            .build();
+                .totalArticles(totalArticles)
+                .totalViews(totalViews)
+                .totalRevenue(totalRevenue)
+                .periodUnit(periodUnit.getApiValue())
+                .freeViewPrice(FREE_REVENUE_PER_VIEW)
+                .vipViewPrice(VIP_REVENUE_PER_VIEW)
+                .chart(chart)
+                .details(details)
+                .build();
     }
 
     @Transactional(readOnly = true)
     public List<AdminTopStatDTO> getAdminTopStats(
-        String targetType,
-        String sortBy,
-        String startDate,
-        String endDate,
-        Integer limit
-    ) {
+            String targetType,
+            String sortBy,
+            String startDate,
+            String endDate,
+            Integer limit) {
         LocalDate start = parseDate(startDate);
         LocalDate end = parseDate(endDate);
         validateDateRange(start, end);
@@ -247,48 +243,49 @@ public class StatService {
         Instant endInstant = end.atTime(LocalTime.MAX).atZone(ZONE_ID).toInstant();
 
         List<ArticleViewRepo.AdminTopStat> rows = target == AdminTopTarget.AUTHOR
-            ? articleViewRepo.findTopAuthorsForAdmin(
-                ArticleStatus.PUBLISHED.name(),
-                startInstant,
-                endInstant,
-                FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            )
-            : articleViewRepo.findTopCategoriesForAdmin(
-                ArticleStatus.PUBLISHED.name(),
-                startInstant,
-                endInstant,
-                FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            );
+                ? articleViewRepo.findTopAuthorsForAdmin(
+                        ArticleStatus.PUBLISHED.name(),
+                        startInstant,
+                        endInstant,
+                        FREE_REVENUE_PER_VIEW,
+                        VIP_REVENUE_PER_VIEW)
+                : articleViewRepo.findTopCategoriesForAdmin(
+                        ArticleStatus.PUBLISHED.name(),
+                        startInstant,
+                        endInstant,
+                        FREE_REVENUE_PER_VIEW,
+                        VIP_REVENUE_PER_VIEW);
 
         Comparator<ArticleViewRepo.AdminTopStat> comparator = topSort == AdminTopSort.VIEWS
-            ? Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed()
-            : Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue())).reversed();
+                ? Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed()
+                : Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue()))
+                        .reversed();
         comparator = comparator
-            .thenComparing(Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue())).reversed())
-            .thenComparing(Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed())
-            .thenComparing(item -> item.getTargetName() == null ? "" : item.getTargetName());
+                .thenComparing(Comparator
+                        .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue())).reversed())
+                .thenComparing(Comparator
+                        .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed())
+                .thenComparing(item -> item.getTargetName() == null ? "" : item.getTargetName());
 
         List<ArticleViewRepo.AdminTopStat> sortedRows = rows.stream()
-            .sorted(comparator)
-            .limit(normalizedLimit)
-            .toList();
+                .sorted(comparator)
+                .limit(normalizedLimit)
+                .toList();
 
         return java.util.stream.IntStream.range(0, sortedRows.size())
-            .mapToObj(index -> toAdminTopStatDTO(sortedRows.get(index), target, index + 1))
-            .toList();
+                .mapToObj(index -> toAdminTopStatDTO(sortedRows.get(index), target, index + 1))
+                .toList();
     }
 
     @Transactional(readOnly = true)
     public List<StatOptionDTO> getAuthorOptions() {
         return userRepo.findByRoleOrderByFullNameAsc(UserRole.AUTHOR)
-            .stream()
-            .map(user -> StatOptionDTO.builder()
-                .id(user.getId())
-                .name(user.getFullName())
-                .build())
-            .toList();
+                .stream()
+                .map(user -> StatOptionDTO.builder()
+                        .id(user.getId())
+                        .name(user.getFullName())
+                        .build())
+                .toList();
     }
 
     private List<TopicStatDTO> buildTopicStats(Integer authorId, Instant startInstant, Instant endInstant) {
@@ -298,16 +295,14 @@ public class StatService {
                 authorId,
                 ArticleStatus.PUBLISHED,
                 startInstant,
-                endInstant
-            )
-            .forEach(item -> {
-                TopicStatAccumulator accumulator = topicMap.computeIfAbsent(
-                    item.getCategoryId(),
-                    categoryId -> new TopicStatAccumulator(categoryId, item.getCategoryName())
-                );
-                accumulator.categoryName = item.getCategoryName();
-                accumulator.articles = safeLong(item.getArticles());
-            });
+                endInstant)
+                .forEach(item -> {
+                    TopicStatAccumulator accumulator = topicMap.computeIfAbsent(
+                            item.getCategoryId(),
+                            categoryId -> new TopicStatAccumulator(categoryId, item.getCategoryName()));
+                    accumulator.categoryName = item.getCategoryName();
+                    accumulator.articles = safeLong(item.getArticles());
+                });
 
         articleViewRepo.findTopicViewRevenue(
                 authorId,
@@ -315,47 +310,43 @@ public class StatService {
                 startInstant,
                 endInstant,
                 FREE_REVENUE_PER_VIEW,
-                VIP_REVENUE_PER_VIEW
-            )
-            .forEach(item -> {
-                TopicStatAccumulator accumulator = topicMap.computeIfAbsent(
-                    item.getCategoryId(),
-                    categoryId -> new TopicStatAccumulator(categoryId, item.getCategoryName())
-                );
-                accumulator.categoryName = item.getCategoryName();
-                accumulator.views = safeLong(item.getViews());
-                accumulator.freeViews = safeLong(item.getFreeViews());
-                accumulator.vipViews = safeLong(item.getVipViews());
-                accumulator.revenue = safeLong(item.getRevenue());
-            });
+                VIP_REVENUE_PER_VIEW)
+                .forEach(item -> {
+                    TopicStatAccumulator accumulator = topicMap.computeIfAbsent(
+                            item.getCategoryId(),
+                            categoryId -> new TopicStatAccumulator(categoryId, item.getCategoryName()));
+                    accumulator.categoryName = item.getCategoryName();
+                    accumulator.views = safeLong(item.getViews());
+                    accumulator.freeViews = safeLong(item.getFreeViews());
+                    accumulator.vipViews = safeLong(item.getVipViews());
+                    accumulator.revenue = safeLong(item.getRevenue());
+                });
 
         return topicMap.values()
-            .stream()
-            .sorted(
-                Comparator.comparingLong(TopicStatAccumulator::getRevenue).reversed()
-                    .thenComparing(Comparator.comparingLong(TopicStatAccumulator::getViews).reversed())
-                    .thenComparing(item -> item.categoryName == null ? "" : item.categoryName)
-            )
-            .map(this::toTopicStatDTO)
-            .toList();
+                .stream()
+                .sorted(
+                        Comparator.comparingLong(TopicStatAccumulator::getRevenue).reversed()
+                                .thenComparing(Comparator.comparingLong(TopicStatAccumulator::getViews).reversed())
+                                .thenComparing(item -> item.categoryName == null ? "" : item.categoryName))
+                .map(this::toTopicStatDTO)
+                .toList();
     }
 
     private TopicStatDTO toTopicStatDTO(TopicStatAccumulator item) {
         long followers = subscriptionRepo.countByTargetTypeAndTargetId(
-            SubscriptionTargetType.CATEGORY,
-            item.categoryId
-        );
+                SubscriptionTargetType.CATEGORY,
+                item.categoryId);
 
         return TopicStatDTO.builder()
-            .categoryId(item.categoryId)
-            .categoryName(item.categoryName)
-            .articles(item.articles)
-            .followers(followers)
-            .views(item.views)
-            .freeViews(item.freeViews)
-            .vipViews(item.vipViews)
-            .revenue(item.revenue)
-            .build();
+                .categoryId(item.categoryId)
+                .categoryName(item.categoryName)
+                .articles(item.articles)
+                .followers(followers)
+                .views(item.views)
+                .freeViews(item.freeViews)
+                .vipViews(item.vipViews)
+                .revenue(item.revenue)
+                .build();
     }
 
     private LocalDate parseDate(String dateValue) {
@@ -427,19 +418,18 @@ public class StatService {
     }
 
     private AdminTopStatDTO toAdminTopStatDTO(
-        ArticleViewRepo.AdminTopStat item,
-        AdminTopTarget target,
-        int rank
-    ) {
+            ArticleViewRepo.AdminTopStat item,
+            AdminTopTarget target,
+            int rank) {
         return AdminTopStatDTO.builder()
-            .rank(rank)
-            .targetType(target.getApiValue())
-            .targetId(item.getTargetId())
-            .targetName(item.getTargetName())
-            .articles(safeLong(item.getArticles()))
-            .views(safeLong(item.getViews()))
-            .revenue(safeLong(item.getRevenue()))
-            .build();
+                .rank(rank)
+                .targetType(target.getApiValue())
+                .targetId(item.getTargetId())
+                .targetName(item.getTargetName())
+                .articles(safeLong(item.getArticles()))
+                .views(safeLong(item.getViews()))
+                .revenue(safeLong(item.getRevenue()))
+                .build();
     }
 
     private long revenueRate(ArticleType articleType) {
@@ -448,6 +438,14 @@ public class StatService {
 
     private long safeLong(Long value) {
         return value == null ? 0L : value;
+    }
+
+    private int safeInt(long value) {
+        return value > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) value;
+    }
+
+    private int safeInt(Long value) {
+        return value == null ? 0 : safeInt(value.longValue());
     }
 
     private User getCurrentUser() {
@@ -465,7 +463,7 @@ public class StatService {
         }
 
         return userRepo.findById(currentUserId)
-            .orElseThrow(() -> new NotFoundException("Khong tim thay nguoi dung"));
+                .orElseThrow(() -> new NotFoundException("Khong tim thay nguoi dung"));
     }
 
     private enum StatPeriodUnit {
@@ -531,5 +529,118 @@ public class StatService {
         private long getRevenue() {
             return revenue;
         }
+    }
+
+    private List<Integer> buildViewSeries(
+            StatPeriodUnit periodUnit,
+            Instant startInstant,
+            Instant endInstant,
+            Map<String, Long> viewsByPeriod) {
+        List<Integer> series = new ArrayList<>();
+
+        switch (periodUnit) {
+            case HOUR -> {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMddHH");
+                ZonedDateTime cursor = startInstant.atZone(ZONE_ID).truncatedTo(ChronoUnit.HOURS);
+                ZonedDateTime endCursor = endInstant.atZone(ZONE_ID).truncatedTo(ChronoUnit.HOURS);
+                while (!cursor.isAfter(endCursor)) {
+                    series.add(safeInt(viewsByPeriod.get(cursor.format(formatter))));
+                    cursor = cursor.plusHours(1);
+                }
+            }
+            case DAY -> {
+                LocalDate cursor = startInstant.atZone(ZONE_ID).toLocalDate();
+                LocalDate endCursor = endInstant.atZone(ZONE_ID).toLocalDate();
+                while (!cursor.isAfter(endCursor)) {
+                    series.add(safeInt(viewsByPeriod.get(cursor.format(DATE_FORMATTER))));
+                    cursor = cursor.plusDays(1);
+                }
+            }
+            case MONTH -> {
+                DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMM");
+                YearMonth cursor = YearMonth.from(startInstant.atZone(ZONE_ID));
+                YearMonth endCursor = YearMonth.from(endInstant.atZone(ZONE_ID));
+                while (!cursor.isAfter(endCursor)) {
+                    series.add(safeInt(viewsByPeriod.get(cursor.format(formatter))));
+                    cursor = cursor.plusMonths(1);
+                }
+            }
+        }
+
+        return series;
+    }
+
+    private void validateHourRange(Instant startInstant, Instant endInstant, StatPeriodUnit periodUnit) {
+        if (periodUnit == StatPeriodUnit.HOUR) {
+            long days = ChronoUnit.DAYS.between(startInstant, endInstant);
+            if (days > 365) {
+                throw new BadRequestException("Khoang thoi gian qua 1 nam, vui long chon theo ngay");
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public ArticleStatDTO calcArticleStat(int articleId, Instant startDate, Instant endDate, String granularity) {
+        var article = articleRepo.findById(articleId)
+                .orElseThrow(() -> new NotFoundException("Khong tim thay bai bao"));
+
+        User currentUser = getCurrentUser();
+        if (currentUser.getRole() == UserRole.AUTHOR) {
+            if (!Objects.equals(currentUser.getId(), article.getAuthor().getId())) {
+                throw new ForbiddenException("Chi duoc xem thong ke bai bao cua chinh minh");
+            }
+        } else if (currentUser.getRole() != UserRole.ADMIN) {
+            throw new ForbiddenException("Khong co quyen xem thong ke");
+        }
+
+        Instant startInstant;
+        Instant endInstant;
+        if (startDate == null || endDate == null) {
+            startInstant = article.getCreatedAt();
+            endInstant = Instant.now();
+        } else {
+            startInstant = startDate;
+            endInstant = endDate;
+        }
+
+        if (startInstant == null || endInstant == null) {
+            throw new BadRequestException("Khong the xac dinh khoang thoi gian");
+        }
+
+        if (startInstant.isAfter(endInstant)) {
+            throw new BadRequestException("Khoang thoi gian khong hop le");
+        }
+
+        StatPeriodUnit periodUnit = parsePeriodUnit(granularity);
+        validateHourRange(startInstant, endInstant, periodUnit);
+
+        List<ArticleViewRepo.ArticleViewPoint> rows = articleViewRepo.findArticleViewPoints(
+                articleId,
+                startInstant,
+                endInstant,
+                periodUnit.getMysqlDateFormat());
+
+        Map<String, Long> viewsByPeriod = new HashMap<>();
+        for (ArticleViewRepo.ArticleViewPoint item : rows) {
+            viewsByPeriod.put(item.getPeriod(), safeLong(item.getViews()));
+        }
+
+        long totalViews = rows.stream()
+                .mapToLong(item -> safeLong(item.getViews()))
+                .sum();
+
+        List<Integer> viewSeries = totalViews == 0
+                ? List.of()
+                : buildViewSeries(periodUnit, startInstant, endInstant, viewsByPeriod);
+
+        long estimatedEarning = ArticleType.VIP.equals(article.getType())
+                ? totalViews * VIP_REVENUE_PER_VIEW
+                : 0L;
+
+        ArticleStatDTO response = new ArticleStatDTO();
+        response.setViews(safeInt(totalViews));
+        response.setEstimatedEarning(safeInt(estimatedEarning));
+        response.setViewsByLevelOfGranularity(viewSeries);
+        return response;
     }
 }
