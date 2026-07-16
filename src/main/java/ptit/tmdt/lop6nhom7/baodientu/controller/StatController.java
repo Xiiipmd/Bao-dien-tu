@@ -67,11 +67,12 @@ public class StatController {
     public ResponseEntity<List<AdminTopStatDTO>> getAdminTopStats(
         @RequestParam(defaultValue = "author") String targetType,
         @RequestParam(defaultValue = "revenue") String sortBy,
+        @RequestParam(defaultValue = "desc") String sortDirection,
         @RequestParam String startDate,
         @RequestParam String endDate,
         @RequestParam(defaultValue = "10") Integer limit
     ) {
-        return ResponseEntity.ok(statService.getAdminTopStats(targetType, sortBy, startDate, endDate, limit));
+        return ResponseEntity.ok(statService.getAdminTopStats(targetType, sortBy, sortDirection, startDate, endDate, limit));
     }
 
     @GetMapping("/admin/authors")

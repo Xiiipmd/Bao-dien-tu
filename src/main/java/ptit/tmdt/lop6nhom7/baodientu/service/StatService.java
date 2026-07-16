@@ -229,6 +229,7 @@ public class StatService {
     public List<AdminTopStatDTO> getAdminTopStats(
             String targetType,
             String sortBy,
+            String sortDirection,
             String startDate,
             String endDate,
             Integer limit) {
@@ -238,6 +239,7 @@ public class StatService {
 
         AdminTopTarget target = parseAdminTopTarget(targetType);
         AdminTopSort topSort = parseAdminTopSort(sortBy);
+        AdminTopDirection direction = parseAdminTopDirection(sortDirection);
         int normalizedLimit = normalizeTopLimit(limit);
         Instant startInstant = start.atStartOfDay(ZONE_ID).toInstant();
         Instant endInstant = end.atTime(LocalTime.MAX).atZone(ZONE_ID).toInstant();
@@ -256,16 +258,7 @@ public class StatService {
                         FREE_REVENUE_PER_VIEW,
                         VIP_REVENUE_PER_VIEW);
 
-        Comparator<ArticleViewRepo.AdminTopStat> comparator = topSort == AdminTopSort.VIEWS
-                ? Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed()
-                : Comparator.comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue()))
-                        .reversed();
-        comparator = comparator
-                .thenComparing(Comparator
-                        .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue())).reversed())
-                .thenComparing(Comparator
-                        .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews())).reversed())
-                .thenComparing(item -> item.getTargetName() == null ? "" : item.getTargetName());
+        Comparator<ArticleViewRepo.AdminTopStat> comparator = buildAdminTopComparator(topSort, direction);
 
         List<ArticleViewRepo.AdminTopStat> sortedRows = rows.stream()
                 .sorted(comparator)
@@ -407,6 +400,43 @@ public class StatService {
         };
     }
 
+    private AdminTopDirection parseAdminTopDirection(String rawSortDirection) {
+        if (rawSortDirection == null || rawSortDirection.isBlank()) {
+            return AdminTopDirection.DESC;
+        }
+
+        return switch (rawSortDirection.trim().toLowerCase(Locale.ROOT)) {
+            case "asc", "ascending", "low", "lowest", "thap-nhat", "thapnhat" -> AdminTopDirection.ASC;
+            case "desc", "descending", "high", "highest", "cao-nhat", "caonhat" -> AdminTopDirection.DESC;
+            default -> throw new BadRequestException("Thu tu xep hang chi chap nhan asc hoac desc");
+        };
+    }
+
+    private Comparator<ArticleViewRepo.AdminTopStat> buildAdminTopComparator(
+            AdminTopSort topSort,
+            AdminTopDirection direction) {
+        Comparator<ArticleViewRepo.AdminTopStat> viewsComparator = Comparator
+                .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getViews()));
+        Comparator<ArticleViewRepo.AdminTopStat> revenueComparator = Comparator
+                .comparingLong((ArticleViewRepo.AdminTopStat item) -> safeLong(item.getRevenue()));
+
+        if (direction == AdminTopDirection.DESC) {
+            viewsComparator = viewsComparator.reversed();
+            revenueComparator = revenueComparator.reversed();
+        }
+
+        Comparator<ArticleViewRepo.AdminTopStat> primary = topSort == AdminTopSort.VIEWS
+                ? viewsComparator
+                : revenueComparator;
+        Comparator<ArticleViewRepo.AdminTopStat> secondary = topSort == AdminTopSort.VIEWS
+                ? revenueComparator
+                : viewsComparator;
+
+        return primary
+                .thenComparing(secondary)
+                .thenComparing(item -> item.getTargetName() == null ? "" : item.getTargetName());
+    }
+
     private int normalizeTopLimit(Integer limit) {
         if (limit == null) {
             return 10;
@@ -506,6 +536,11 @@ public class StatService {
     private enum AdminTopSort {
         REVENUE,
         VIEWS
+    }
+
+    private enum AdminTopDirection {
+        ASC,
+        DESC
     }
 
     private static class TopicStatAccumulator {
