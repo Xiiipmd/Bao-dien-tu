@@ -1,4 +1,4 @@
-# 6-7-TMDT-Backend
+# Thực tập tốt nghiệp
 
 ## Quy tắc làm việc nhóm
 1. Nhánh main dùng để chứa mã nguồn hoàn thiện.
