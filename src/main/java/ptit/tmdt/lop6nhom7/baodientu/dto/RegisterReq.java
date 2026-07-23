@@ -19,6 +19,8 @@ public class RegisterReq {
   @NotBlank(message = "Password khong duoc bo trong")
   private String confirmation;
 
+  private String role;
+
   public void setEmail(String email) {
     this.email = email == null ? null : email.trim();
   }
@@ -33,5 +35,9 @@ public class RegisterReq {
 
   public void setConfirmation(String confirmation) {
     this.confirmation = confirmation == null ? null : confirmation.trim();
+  }
+
+  public void setRole(String role) {
+    this.role = role == null ? null : role.trim();
   }
 }

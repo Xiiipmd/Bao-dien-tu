@@ -21,6 +21,7 @@ import ptit.tmdt.lop6nhom7.baodientu.repository.UserRepo;
 import ptit.tmdt.lop6nhom7.baodientu.security.JwtService;
 
 import java.time.Instant;
+import java.util.Locale;
 
 @Service
 @RequiredArgsConstructor
@@ -58,6 +59,7 @@ public class AuthService {
     String name = request.getName().trim();
     String password = request.getPassword().trim();
     String confirmation = request.getConfirmation().trim();
+    UserRole requestedRole = parseSelfRegisterRole(request.getRole());
 
     //
     if (!password.equals(confirmation)) {
@@ -73,10 +75,22 @@ public class AuthService {
     newUser.setFullName(name);
     newUser.setStatus(UserStatus.ACTIVE);
     newUser.setPasswordHash(passwordEncoder.encode(password));
-    newUser.setRole(UserRole.MEMBER);
+    newUser.setRole(requestedRole);
     newUser.setFreeArticlesLeft(3);
     newUser.setVipExpiryDate(Instant.now());
     newUser.setCreatedAt(Instant.now());
     userRepo.save(newUser);
+  }
+
+  private UserRole parseSelfRegisterRole(String rawRole) {
+    if (rawRole == null || rawRole.isBlank()) {
+      return UserRole.MEMBER;
+    }
+
+    return switch (rawRole.trim().toUpperCase(Locale.ROOT)) {
+      case "MEMBER" -> UserRole.MEMBER;
+      case "AUTHOR" -> UserRole.AUTHOR;
+      default -> throw new ConflictException("Chi duoc dang ky tai khoan member hoac author");
+    };
   }
 }
