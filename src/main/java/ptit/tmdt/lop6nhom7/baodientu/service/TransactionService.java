@@ -3,6 +3,7 @@ package ptit.tmdt.lop6nhom7.baodientu.service;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -230,9 +231,19 @@ public class TransactionService {
      * Get currently authenticated user from security context.
      */
     private User getCurrentUser() {
-        Long userId = Long.parseLong(
-                SecurityContextHolder.getContext().getAuthentication().getName()
-        );
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || authentication.getPrincipal() == null) {
+            throw new RuntimeException("User not found");
+        }
+
+        Object principal = authentication.getPrincipal();
+        Long userId;
+        if (principal instanceof Number number) {
+            userId = number.longValue();
+        } else {
+            userId = Long.parseLong(authentication.getName());
+        }
+
         return userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
