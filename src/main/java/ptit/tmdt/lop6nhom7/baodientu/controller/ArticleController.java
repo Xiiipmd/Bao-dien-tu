@@ -72,6 +72,11 @@ public class ArticleController {
         return ResponseEntity.ok(articleService.getHomeArticles(userId));
     }
 
+    @GetMapping("/trending")
+    public ResponseEntity<java.util.List<ArticleSearchResponse>> getTrendingArticles() {
+        return ResponseEntity.ok(articleService.getTrendingArticles());
+    }
+
     @GetMapping("/summary")
     @PreAuthorize("hasAnyRole('VIP', 'ADMIN')")
     public ResponseEntity<ArticleDTO> getAIArticleSummary(@RequestParam("articleId") int articleId) throws Exception {

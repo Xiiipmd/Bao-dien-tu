@@ -20,6 +20,8 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
   Optional<Article> findByIdAndStatus(Integer id, ArticleStatus status);
   @EntityGraph(attributePaths = {"author", "category"})
   Optional<Article> findWithAuthorAndCategoryById(Integer id);
+  @EntityGraph(attributePaths = {"author", "category"})
+  List<Article> findByIdIn(List<Integer> ids);
   List<Article> findByStatusOrderByCreatedAtDesc(ArticleStatus status);
   List<Article> findByStatusInOrderByCreatedAtDesc(List<ArticleStatus> statuses);
   List<Article> findByStatusInAndTitleContainingIgnoreCaseOrderByCreatedAtDesc(List<ArticleStatus> statuses, String title);

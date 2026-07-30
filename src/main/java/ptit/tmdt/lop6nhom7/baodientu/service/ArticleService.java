@@ -14,6 +14,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.function.Function;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,6 +54,8 @@ public class ArticleService {
     private static final int PREVIEW_CHARACTER_LIMIT = 700;
     private static final int MONTHLY_FREE_VIP_ARTICLE_LIMIT = 3;
     private static final int HOME_ARTICLE_LIMIT = 12;
+    private static final int TRENDING_ARTICLE_LIMIT = 3;
+    private static final int TRENDING_PERIOD_DAYS = 3;
     
     private final ArticleRepo articleRepo;
     private final ArticleViewRepo articleViewRepo;
@@ -223,6 +228,34 @@ public class ArticleService {
             ));
         }
         return preferred.stream().map(this::toSearchResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArticleSearchResponse> getTrendingArticles() {
+        Instant endDate = Instant.now();
+        Instant startDate = endDate.minus(TRENDING_PERIOD_DAYS, ChronoUnit.DAYS);
+        List<Integer> rankedIds = articleViewRepo.findTrendingArticles(
+                ArticleStatus.PUBLISHED.name(),
+                startDate,
+                endDate,
+                PageRequest.of(0, TRENDING_ARTICLE_LIMIT)
+            )
+            .stream()
+            .map(ArticleViewRepo.TrendingArticleView::getArticleId)
+            .toList();
+
+        if (rankedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, Article> articlesById = articleRepo.findByIdIn(rankedIds).stream()
+            .collect(Collectors.toMap(Article::getId, Function.identity()));
+
+        return rankedIds.stream()
+            .map(articlesById::get)
+            .filter(java.util.Objects::nonNull)
+            .map(this::toSearchResponse)
+            .toList();
     }
 
     @Transactional
