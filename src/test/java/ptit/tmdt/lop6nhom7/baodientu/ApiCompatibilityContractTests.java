@@ -14,6 +14,7 @@ import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleSearchResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.LoginRes;
 import ptit.tmdt.lop6nhom7.baodientu.dto.VipPackageResponse;
 import ptit.tmdt.lop6nhom7.baodientu.enums.UserRole;
+import ptit.tmdt.lop6nhom7.baodientu.enums.VipPreviewAccessMode;
 
 class ApiCompatibilityContractTests {
 
@@ -30,6 +31,9 @@ class ApiCompatibilityContractTests {
     ArticlePreviewResponse preview = ArticlePreviewResponse.builder()
         .authorId(4)
         .categoryId(2)
+        .accessMode(VipPreviewAccessMode.FREE_QUOTA)
+        .remainingFreeReads(3)
+        .willConsumeFreeRead(true)
         .build();
 
     assertAll(
@@ -38,7 +42,10 @@ class ApiCompatibilityContractTests {
         () -> assertEquals(4, read.getAuthorId()),
         () -> assertEquals(2, read.getCategoryId()),
         () -> assertEquals(4, preview.getAuthorId()),
-        () -> assertEquals(2, preview.getCategoryId())
+        () -> assertEquals(2, preview.getCategoryId()),
+        () -> assertEquals(VipPreviewAccessMode.FREE_QUOTA, preview.getAccessMode()),
+        () -> assertEquals(3, preview.getRemainingFreeReads()),
+        () -> assertEquals(true, preview.isWillConsumeFreeRead())
     );
   }
 

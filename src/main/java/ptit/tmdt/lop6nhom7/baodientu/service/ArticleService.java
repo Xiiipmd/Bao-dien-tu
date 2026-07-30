@@ -32,6 +32,7 @@ import ptit.tmdt.lop6nhom7.baodientu.entity.User;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 import ptit.tmdt.lop6nhom7.baodientu.enums.UserStatus;
+import ptit.tmdt.lop6nhom7.baodientu.enums.VipPreviewAccessMode;
 import ptit.tmdt.lop6nhom7.baodientu.exception.BadRequestException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.ForbiddenException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.NotFoundException;
@@ -110,6 +111,7 @@ public class ArticleService {
             .build();
     }
 
+    @Transactional(readOnly = true)
     public ArticlePreviewResponse getVipArticlePreview(int articleId) {
         Article article = articleRepo.findByIdAndStatus(articleId, ArticleStatus.PUBLISHED)
             .orElseThrow(() -> new NotFoundException("Không tìm thấy bài báo đang xuất bản"));
@@ -117,6 +119,8 @@ public class ArticleService {
         if (article.getType() != ArticleType.VIP) {
             throw new BadRequestException("Chức năng preview chỉ áp dụng cho bài viết VIP");
         }
+
+        VipPreviewDecision previewDecision = resolveVipPreviewAccess(article);
 
         return ArticlePreviewResponse.builder()
             .id(article.getId())
@@ -130,6 +134,10 @@ public class ArticleService {
             .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
             .paywallRequired(true)
+            .accessMode(previewDecision.accessMode())
+            .remainingFreeReads(previewDecision.remainingFreeReads())
+            .alreadyRead(previewDecision.alreadyRead())
+            .willConsumeFreeRead(previewDecision.willConsumeFreeRead())
             .build();
     }
 
@@ -322,6 +330,48 @@ public class ArticleService {
         return MeteredDecision.metered(result.remainingReads(), result.newlyConsumed());
     }
 
+    private VipPreviewDecision resolveVipPreviewAccess(Article article) {
+        Optional<User> currentUser = getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return VipPreviewDecision.loginRequired();
+        }
+
+        User user = currentUser.get();
+        if (hasActiveVip(user)) {
+            return VipPreviewDecision.vip();
+        }
+        if (user.getStatus() == UserStatus.LOCKED) {
+            return VipPreviewDecision.paywall(0);
+        }
+
+        Instant startOfMonth = LocalDate.now()
+            .withDayOfMonth(1)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant();
+        Instant now = Instant.now();
+        boolean alreadyRead = articleViewRepo.existsByUserIdAndArticleIdAndViewedAtBetween(
+            user.getId(),
+            article.getId(),
+            startOfMonth,
+            now
+        );
+        long usedReads = articleViewRepo.countDistinctArticlesByUserAndTypeWithinPeriod(
+            user.getId(),
+            ArticleType.VIP,
+            startOfMonth,
+            now
+        );
+        int remaining = Math.max(0, MONTHLY_FREE_VIP_ARTICLE_LIMIT - (int) usedReads);
+
+        if (alreadyRead) {
+            return VipPreviewDecision.alreadyRead(remaining);
+        }
+        if (remaining > 0) {
+            return VipPreviewDecision.freeQuota(remaining);
+        }
+        return VipPreviewDecision.paywall(0);
+    }
+
     private void recordView(Article article, User user) {
         ArticleView articleView = new ArticleView();
         articleView.setArticle(article);
@@ -416,6 +466,53 @@ public class ArticleService {
 
         private static MeteredDecision metered(int remainingFreeReads, boolean newlyConsumed) {
             return new MeteredDecision(true, remainingFreeReads, newlyConsumed);
+        }
+    }
+
+    private record VipPreviewDecision(
+        VipPreviewAccessMode accessMode,
+        Integer remainingFreeReads,
+        boolean alreadyRead,
+        boolean willConsumeFreeRead
+    ) {
+        private static VipPreviewDecision vip() {
+            return new VipPreviewDecision(VipPreviewAccessMode.VIP, null, false, false);
+        }
+
+        private static VipPreviewDecision freeQuota(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.FREE_QUOTA,
+                remainingFreeReads,
+                false,
+                true
+            );
+        }
+
+        private static VipPreviewDecision alreadyRead(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.ALREADY_READ,
+                remainingFreeReads,
+                true,
+                false
+            );
+        }
+
+        private static VipPreviewDecision paywall(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.PAYWALL,
+                remainingFreeReads,
+                false,
+                false
+            );
+        }
+
+        private static VipPreviewDecision loginRequired() {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.LOGIN_REQUIRED,
+                null,
+                false,
+                false
+            );
         }
     }
 
