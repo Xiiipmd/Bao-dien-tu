@@ -15,6 +15,25 @@ import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 
 @Repository
 public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
+    @Query(value = """
+            select a.id as articleId,
+                count(av.id) as views
+            from articles a
+            left join article_views av
+                on av.article_id = a.id
+                and av.viewed_at between :startDate and :endDate
+            where a.status = :status
+            group by a.id, a.published_at, a.created_at
+            order by views desc,
+                coalesce(a.published_at, a.created_at) desc,
+                a.id desc
+            """, nativeQuery = true)
+    List<TrendingArticleView> findTrendingArticles(
+            @Param("status") String status,
+            @Param("startDate") Instant startDate,
+            @Param("endDate") Instant endDate,
+            Pageable pageable);
+
     boolean existsByUserIdAndArticleIdAndViewedAtBetween(
             Integer userId,
             Integer articleId,
@@ -225,6 +244,12 @@ public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
         Instant getCreatedAt();
 
         ArticleType getArticleType();
+
+        Long getViews();
+    }
+
+    interface TrendingArticleView {
+        Integer getArticleId();
 
         Long getViews();
     }

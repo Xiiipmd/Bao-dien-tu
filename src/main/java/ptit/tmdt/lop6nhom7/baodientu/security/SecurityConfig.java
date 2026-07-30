@@ -39,6 +39,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/articles/*/read").permitAll()
                         .requestMatchers("/api/articles/search").permitAll()
                         .requestMatchers("/api/articles/home").permitAll()
+                        .requestMatchers("/api/articles/trending").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/articles/*/comments").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
