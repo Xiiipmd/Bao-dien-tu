@@ -10,6 +10,8 @@ import ptit.tmdt.lop6nhom7.baodientu.enums.UserRole;
 import ptit.tmdt.lop6nhom7.baodientu.enums.UserStatus;
 
 import java.time.Instant;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -56,5 +58,18 @@ public class User {
   @ColumnDefault("CURRENT_TIMESTAMP")
   @Column(name = "created_at")
   private Instant createdAt;
+
+  @ColumnDefault("true")
+  @Column(name = "push_notifications_enabled", nullable = false)
+  private Boolean pushNotificationsEnabled = true;
+
+  @ManyToMany(fetch = FetchType.LAZY)
+  @JoinTable(
+      name = "user_topic_preferences",
+      schema = "pthttmdt",
+      joinColumns = @JoinColumn(name = "user_id"),
+      inverseJoinColumns = @JoinColumn(name = "category_id")
+  )
+  private Set<Category> preferredCategories = new LinkedHashSet<>();
   
 }

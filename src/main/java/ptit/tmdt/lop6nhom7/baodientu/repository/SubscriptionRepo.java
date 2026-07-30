@@ -12,6 +12,7 @@ import java.util.Optional;
 @Repository
 public interface SubscriptionRepo extends JpaRepository<Subscription, Integer> {
   List<Subscription> findByUserOrderByIdDesc(User user);
+  List<Subscription> findByUserAndTargetType(User user, SubscriptionTargetType targetType);
 
   Optional<Subscription> findByUserAndTargetTypeAndTargetId(
       User user,

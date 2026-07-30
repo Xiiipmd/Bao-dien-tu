@@ -1,8 +1,11 @@
 package ptit.tmdt.lop6nhom7.baodientu.service;
 
 import java.util.Arrays;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.time.Instant;
@@ -13,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.PageRequest;
 
 import com.google.genai.Client;
 
@@ -42,11 +46,13 @@ public class ArticleService {
     private static final int PREVIEW_PARAGRAPH_LIMIT = 2;
     private static final int PREVIEW_CHARACTER_LIMIT = 700;
     private static final int MONTHLY_FREE_VIP_ARTICLE_LIMIT = 3;
+    private static final int HOME_ARTICLE_LIMIT = 12;
     
     private final ArticleRepo articleRepo;
     private final ArticleViewRepo articleViewRepo;
     private final UserRepo userRepo;
     private final AnonymousReadMeterService anonymousReadMeterService;
+    private final NewsNotificationService newsNotificationService;
     private final Client geminiClient = new Client();
     private final List<String> geminiModels = List.of(
         "gemini-3.1-pro-preview",
@@ -138,6 +144,68 @@ public class ArticleService {
                 .map(this::toSearchResponse)
                 .toList();
             }
+
+    @Transactional(readOnly = true)
+    public List<ArticleSearchResponse> getPersonalizedArticles(Integer userId) {
+        User user = userRepo.findWithPreferredCategoriesById(userId)
+            .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
+        Set<Integer> preferredCategoryIds = new HashSet<>();
+        user.getPreferredCategories().forEach(category -> preferredCategoryIds.add(category.getId()));
+
+        Comparator<Article> personalizedOrder = Comparator
+            .comparing((Article article) -> !preferredCategoryIds.contains(article.getCategory().getId()))
+            .thenComparing(
+                Article::getCreatedAt,
+                Comparator.nullsLast(Comparator.reverseOrder())
+            );
+
+        return articleRepo.findPublishedArticlesByRecency(ArticleStatus.PUBLISHED).stream()
+            .sorted(personalizedOrder)
+            .map(this::toSearchResponse)
+            .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArticleSearchResponse> getHomeArticles(Integer userId) {
+        if (userId == null) {
+            return articleRepo.findHomeArticles(
+                    ArticleStatus.PUBLISHED,
+                    PageRequest.of(0, HOME_ARTICLE_LIMIT)
+                )
+                .stream()
+                .map(this::toSearchResponse)
+                .toList();
+        }
+
+        User user = userRepo.findWithPreferredCategoriesById(userId).orElse(null);
+        if (user == null || user.getPreferredCategories().isEmpty()) {
+            return articleRepo.findHomeArticles(
+                    ArticleStatus.PUBLISHED,
+                    PageRequest.of(0, HOME_ARTICLE_LIMIT)
+                )
+                .stream()
+                .map(this::toSearchResponse)
+                .toList();
+        }
+
+        Set<Integer> categoryIds = user.getPreferredCategories().stream()
+            .map(category -> category.getId())
+            .collect(java.util.stream.Collectors.toSet());
+        List<Article> preferred = articleRepo.findPreferredHomeArticles(
+            ArticleStatus.PUBLISHED,
+            categoryIds,
+            PageRequest.of(0, HOME_ARTICLE_LIMIT)
+        );
+        int remaining = HOME_ARTICLE_LIMIT - preferred.size();
+        if (remaining > 0) {
+            preferred.addAll(articleRepo.findNonPreferredHomeArticles(
+                ArticleStatus.PUBLISHED,
+                categoryIds,
+                PageRequest.of(0, remaining)
+            ));
+        }
+        return preferred.stream().map(this::toSearchResponse).toList();
+    }
 
     @Transactional
     public ArticleReadResponse readArticle(int articleId, String anonymousReaderKey) {
@@ -261,6 +329,7 @@ public class ArticleService {
 
         article.setViewCount((article.getViewCount() == null ? 0 : article.getViewCount()) + 1);
         articleRepo.save(article);
+        newsNotificationService.notifyIfHot(article);
     }
 
     private Optional<User> getCurrentUser() {
@@ -324,8 +393,12 @@ public class ArticleService {
             .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
             .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
-            .createdAt(article.getCreatedAt())
+            .createdAt(effectivePublishedAt(article))
             .build();
+    }
+
+    private Instant effectivePublishedAt(Article article) {
+        return article.getPublishedAt() != null ? article.getPublishedAt() : article.getCreatedAt();
     }
 
     private record MeteredDecision(boolean applied, Integer remainingFreeReads, boolean newlyConsumed) {

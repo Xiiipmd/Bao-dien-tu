@@ -44,11 +44,11 @@ public class Article {
   private String title;
   
   @NotNull
-  @Column(name = "sapo", nullable = false)
+  @Column(name = "sapo", nullable = false, columnDefinition = "TEXT")
   private String sapo;
   
   @NotNull
-  @Column(name = "content", nullable = false)
+  @Column(name = "content", nullable = false, columnDefinition = "LONGTEXT")
   private String content;
   
   @NotNull
@@ -60,7 +60,7 @@ public class Article {
   @Enumerated(EnumType.STRING)
   private ArticleStatus status;
   
-  @Column(name = "rejection_reason")
+  @Column(name = "rejection_reason", columnDefinition = "TEXT")
   private String rejectionReason;
   
   @ColumnDefault("0")
@@ -70,6 +70,9 @@ public class Article {
   @ColumnDefault("CURRENT_TIMESTAMP")
   @Column(name = "created_at")
   private Instant createdAt;
+
+  @Column(name = "published_at")
+  private Instant publishedAt;
   
   @OneToMany(mappedBy = "article")
   private Set<Comment> comments = new LinkedHashSet<>();

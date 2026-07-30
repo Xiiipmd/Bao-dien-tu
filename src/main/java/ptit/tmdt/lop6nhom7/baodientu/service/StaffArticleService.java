@@ -32,6 +32,7 @@ public class StaffArticleService {
     private final ArticleRepo articleRepo;
     private final CategoryRepo categoryRepo;
     private final UserRepo userRepo;
+    private final NewsNotificationService newsNotificationService;
 
     @Transactional
     public void createArticle(ArticleDTO articleDTO) {
@@ -50,9 +51,7 @@ public class StaffArticleService {
         Article article = articleDTO.toArticle();
         article.setAuthor(author);
         article.setCategory(category);
-        if (article.getStatus() == null) {
-            article.setStatus(ArticleStatus.PENDING);
-        }
+        article.setStatus(ArticleStatus.PENDING);
         if (article.getViewCount() == null) {
             article.setViewCount(0);
         }
@@ -60,7 +59,8 @@ public class StaffArticleService {
             article.setCreatedAt(Instant.now());
         }
 
-        articleRepo.save(article);
+        Article savedArticle = articleRepo.save(article);
+        newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, false);
     }
 
     @Transactional(readOnly = true)
@@ -131,12 +131,17 @@ public class StaffArticleService {
         article.setContent(request.getContent().trim());
         article.setType(request.getType());
 
-        if (article.getStatus() == ArticleStatus.REJECTED) {
+        boolean resubmitted = article.getStatus() == ArticleStatus.REJECTED
+                && currentUser.getRole() == UserRole.AUTHOR;
+        if (resubmitted) {
             article.setStatus(ArticleStatus.PENDING);
             article.setRejectionReason(null);
         }
 
         Article savedArticle = articleRepo.save(article);
+        if (resubmitted) {
+            newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, true);
+        }
         return toDto(savedArticle);
     }
 

@@ -5,6 +5,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -52,6 +53,21 @@ public class ArticleController {
         @RequestParam(value = "authorName", required = false) String authorName
     ) {
         return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorName));
+    }
+
+    @GetMapping("/personalized")
+    public ResponseEntity<java.util.List<ArticleSearchResponse>> getPersonalizedArticles(
+        Authentication authentication
+    ) {
+        return ResponseEntity.ok(articleService.getPersonalizedArticles((Integer) authentication.getPrincipal()));
+    }
+
+    @GetMapping("/home")
+    public ResponseEntity<java.util.List<ArticleSearchResponse>> getHomeArticles(
+        Authentication authentication
+    ) {
+        Integer userId = authentication == null ? null : (Integer) authentication.getPrincipal();
+        return ResponseEntity.ok(articleService.getHomeArticles(userId));
     }
 
     @GetMapping("/summary")
