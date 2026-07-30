@@ -2,6 +2,7 @@ package ptit.tmdt.lop6nhom7.baodientu.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
@@ -11,6 +12,7 @@ import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 import ptit.tmdt.lop6nhom7.baodientu.exception.BadRequestException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.ForbiddenException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.NotFoundException;
+import ptit.tmdt.lop6nhom7.baodientu.event.ArticleModerationDecidedEvent;
 import ptit.tmdt.lop6nhom7.baodientu.repository.ArticleRepo;
 
 import java.util.List;
@@ -25,8 +27,8 @@ public class ModerationArticleService {
   );
 
   private final ArticleRepo articleRepo;
-  private final NewArticleEmailNotificationService newArticleEmailNotificationService;
-  private final ModerationNotificationService moderationNotificationService;
+  private final ApplicationEventPublisher eventPublisher;
+  private final NewsNotificationService newsNotificationService;
 
   @Transactional(readOnly = true)
   public List<ArticleDTO> getPendingArticles() {
@@ -82,10 +84,11 @@ public class ModerationArticleService {
     if (request.isApproved()) {
       article.setStatus(ArticleStatus.PUBLISHED);
       article.setRejectionReason(null);
+      article.setPublishedAt(java.time.Instant.now());
       Article savedArticle = articleRepo.save(article);
-      moderationNotificationService.notifyAuthorAboutDecision(savedArticle, true);
-      int notifiedSubscribers = newArticleEmailNotificationService.notifySubscribersAboutNewArticle(savedArticle);
-      log.info("Approved articleId={} and notified {} subscribers", savedArticle.getId(), notifiedSubscribers);
+      newsNotificationService.markModerationNotificationsHandled(savedArticle.getId());
+      eventPublisher.publishEvent(new ArticleModerationDecidedEvent(savedArticle.getId(), true));
+      log.info("Approved articleId={} and queued notifications for after commit", savedArticle.getId());
       return toDto(savedArticle);
     }
 
@@ -97,7 +100,8 @@ public class ModerationArticleService {
     article.setStatus(ArticleStatus.REJECTED);
     article.setRejectionReason(rejectionReason);
     Article savedArticle = articleRepo.save(article);
-    moderationNotificationService.notifyAuthorAboutDecision(savedArticle, false);
+    newsNotificationService.markModerationNotificationsHandled(savedArticle.getId());
+    eventPublisher.publishEvent(new ArticleModerationDecidedEvent(savedArticle.getId(), false));
     log.info("Rejected articleId={} with reason length={}", savedArticle.getId(), rejectionReason.length());
     return toDto(savedArticle);
   }
@@ -122,6 +126,9 @@ public class ModerationArticleService {
     }
 
     article.setStatus(ArticleStatus.PUBLISHED);
+    if (article.getPublishedAt() == null) {
+      article.setPublishedAt(java.time.Instant.now());
+    }
     Article savedArticle = articleRepo.save(article);
     return toDto(savedArticle);
   }

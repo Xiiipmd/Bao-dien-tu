@@ -4,7 +4,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: ${TMDT_DDL_AUTO:update}
   datasource:
     url: ${TMDT_DB_URL:jdbc:mysql://localhost:3306/pthttmdt?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Ho_Chi_Minh} # update to ssl later to secure
     username: ${TMDT_DB_USERNAME:root}
@@ -13,14 +13,17 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${TMDT_MAIL_USERNAME}
-    password: ${TMDT_MAIL_PASSWORD}
+    username: ${TMDT_MAIL_USERNAME:}
+    password: ${TMDT_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          connectiontimeout: 10000
+          timeout: 10000
+          writetimeout: 10000
 
 
   

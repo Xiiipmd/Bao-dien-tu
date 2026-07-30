@@ -3,6 +3,7 @@ package ptit.tmdt.lop6nhom7.baodientu.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -14,11 +15,13 @@ import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
 @RequiredArgsConstructor
 public class ModerationNotificationService {
   private final ObjectProvider<JavaMailSender> mailSenderProvider;
+  @Value("${spring.mail.username:}")
+  private String fromAddress;
 
   public void notifyAuthorAboutDecision(Article article, boolean approved) {
     JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
-    if (mailSender == null) {
-      log.info("Mail sender is not configured; skipped moderation email for articleId={}", article.getId());
+    if (mailSender == null || fromAddress == null || fromAddress.isBlank()) {
+      log.warn("Mail sender is not configured; skipped moderation email for articleId={}", article.getId());
       return;
     }
 
@@ -29,6 +32,7 @@ public class ModerationNotificationService {
     }
 
     SimpleMailMessage message = new SimpleMailMessage();
+    message.setFrom(fromAddress);
     message.setTo(authorEmail);
     message.setSubject(approved
         ? "Bai viet da duoc duyet: " + article.getTitle()

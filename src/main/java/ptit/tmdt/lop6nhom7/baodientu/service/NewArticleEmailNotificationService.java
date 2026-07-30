@@ -33,8 +33,8 @@ public class NewArticleEmailNotificationService {
     Map<String, Subscription> recipients = collectRecipients(article);
     JavaMailSender mailSender = mailSenderProvider.getIfAvailable();
 
-    if (mailSender == null) {
-      log.info("Mail sender is not configured; skipped {} new-article emails for articleId={}",
+    if (mailSender == null || fromAddress == null || fromAddress.isBlank()) {
+      log.warn("Mail sender is not configured; skipped {} new-article emails for articleId={}",
           recipients.size(), article.getId());
       return 0;
     }
