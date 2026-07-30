@@ -25,6 +25,8 @@ spring:
           timeout: 10000
           writetimeout: 10000
 
+server:
+  port: ${PORT:8082}
 
   
 logging:
@@ -37,11 +39,11 @@ app:
     expiration: 86400000
 
 vnpay:
-  tmn-code: TJZUNZ97
-  hash-secret: JH64A5OFI3570Y5A4A5R37PHUR604QF3
-  url: https://sandbox.vnpayment.vn/paymentv2/vpcpay.html
-  return-url: https://travel-accent-tinker.ngrok-free.dev/api/transactions/vnpay-return
-  ipn-url: https://travel-accent-tinker.ngrok-free.dev/api/transactions/vnpay-ipn
+  tmn-code: ${VNPAY_TMN_CODE:}
+  hash-secret: ${VNPAY_HASH_SECRET:}
+  url: ${VNPAY_URL:https://sandbox.vnpayment.vn/paymentv2/vpcpay.html}
+  return-url: ${VNPAY_RETURN_URL:http://localhost:8082/api/transactions/vnpay-return}
+  ipn-url: ${VNPAY_IPN_URL:http://localhost:8082/api/transactions/vnpay-ipn}
   version: "2.1.0"
   command: pay
   order-type: other

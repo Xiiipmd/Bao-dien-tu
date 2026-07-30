@@ -51,7 +51,15 @@ public class AuthService {
     // Generate JWT
     String jwtToken = jwtService.generateToken(u);
     // return
-    return new LoginRes(jwtToken, u.getRole(), u.getFullName(), u.getVipExpiryDate(), u.getFreeArticlesLeft());
+    return new LoginRes(
+        jwtToken,
+        u.getRole(),
+        u.getFullName(),
+        u.getVipExpiryDate(),
+        u.getFreeArticlesLeft(),
+        u.getId(),
+        u.getEmail()
+    );
   }
   
   public void register(RegisterReq request) {

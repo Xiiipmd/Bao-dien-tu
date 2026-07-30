@@ -38,6 +38,7 @@ public class VipPackageService {
                 .name(p.getName())
                 .durationDays(p.getDurationDays())
                 .price(p.getPrice())
+                .discountPercent(p.getDiscountPercent())
                 .description(p.getDescription())
                 .build();
     }

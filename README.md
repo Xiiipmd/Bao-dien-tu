@@ -10,13 +10,19 @@
 7. Xong 1 feature thì phải commit rồi push lên Github ngay.
 8. Workflow phải pass thì mới được merge, pull request.
 
+## Yêu cầu môi trường
+
+- JDK 25 trở lên (`java -version`)
+- MySQL 8 cho cách chạy local
+- Không lưu mật khẩu hoặc API key trong mã nguồn
+
 ## Chạy backend bằng VS Code
 
 ### Cách 1: Chạy với MySQL local
-Mở terminal trong VS Code tại thư mục backend:
+Mở terminal trong VS Code tại thư mục `Bao-dien-tu`:
 
 ```powershell
-cd D:\TMDT\6-7-TMDT-Backend-latest
+cd D:\app\Bao-dien-tu
 $env:TMDT_JWT_SECRET="dG1kdC1sb2NhbC1zZWNyZXQta2V5LTMyLWJ5dGVzISE="
 $env:TMDT_MAIL_USERNAME="local@example.com"
 $env:TMDT_MAIL_PASSWORD="local-password"
@@ -37,10 +43,10 @@ Repo có sẵn file:
 run-backend-azure.ps1
 ```
 
-Mở terminal trong VS Code tại thư mục backend rồi chạy:
+Mở terminal trong VS Code tại thư mục `Bao-dien-tu` rồi chạy:
 
 ```powershell
-cd D:\TMDT\6-7-TMDT-Backend-latest
+cd D:\app\Bao-dien-tu
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\run-backend-azure.ps1
 ```
@@ -56,6 +62,8 @@ TMDT_MAIL_PASSWORD
 GEMINI_API_KEY
 ```
 
+Nếu chưa có `TMDT_JWT_SECRET`, script tạo một khóa JWT ngẫu nhiên chỉ cho tiến trình hiện tại. Muốn token đăng nhập còn hiệu lực sau khi khởi động lại backend, hãy đặt một khóa riêng trong biến môi trường và tuyệt đối không commit khóa đó.
+
 Riêng `TMDT_DB_PASSWORD` không được lưu trong GitHub. Khi chạy, script sẽ hỏi mật khẩu Azure MySQL. Nếu không muốn nhập lại mỗi lần, có thể set trước trong terminal:
 
 ```powershell
@@ -66,5 +74,31 @@ $env:TMDT_DB_PASSWORD="your-azure-mysql-password"
 Backend chạy đúng khi terminal hiện:
 
 ```text
-Tomcat started on port 8080
+Tomcat started on port 8082
+```
+
+Backend mặc định dùng cổng `8082` cho cả web và app. Có thể đổi cổng tạm thời bằng biến môi trường `PORT`.
+
+Web chạy qua Vite proxy tại `http://localhost:8082`. Nếu backend dùng địa chỉ khác:
+
+```powershell
+$env:VITE_API_PROXY_TARGET="http://localhost:8082"
+npm run dev
+```
+
+App Expo đọc địa chỉ backend từ `EXPO_PUBLIC_API_URL`. Khi chạy app trên điện thoại thật, dùng IP LAN của máy tính thay cho `localhost`:
+
+```powershell
+$env:EXPO_PUBLIC_API_URL="http://<IP-LAN-CUA-MAY>:8082"
+npm start
+```
+
+Không commit mật khẩu database, JWT secret, Gemini API key hoặc VNPay hash secret. Các biến VNPay được hỗ trợ gồm:
+
+```text
+VNPAY_TMN_CODE
+VNPAY_HASH_SECRET
+VNPAY_URL
+VNPAY_RETURN_URL
+VNPAY_IPN_URL
 ```

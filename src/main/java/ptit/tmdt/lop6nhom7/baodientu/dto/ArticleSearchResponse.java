@@ -15,7 +15,9 @@ public class ArticleSearchResponse {
   private String coverImage;
   private Integer authorId;
   private String authorName;
+  private Integer categoryId;
   private String categoryName;
   private ArticleType type;
+  private Integer viewCount;
   private Instant createdAt;
 }

@@ -14,4 +14,6 @@ public class LoginRes {
   private String name;
   private Instant vipExpiryDate;
   private int freeArticlesLeft;
+  private Integer id;
+  private String email;
 }

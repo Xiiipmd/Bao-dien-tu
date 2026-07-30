@@ -24,7 +24,15 @@ if (-not $env:TMDT_DB_PASSWORD) {
 }
 
 if (-not $env:TMDT_JWT_SECRET) {
-  $env:TMDT_JWT_SECRET = 'dG1kdC1sb2NhbC1zZWNyZXQta2V5LTMyLWJ5dGVzISE='
+  $jwtSecretBytes = New-Object byte[] 32
+  $randomGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $randomGenerator.GetBytes($jwtSecretBytes)
+    $env:TMDT_JWT_SECRET = [Convert]::ToBase64String($jwtSecretBytes)
+  } finally {
+    $randomGenerator.Dispose()
+  }
+  Write-Host 'Generated a temporary JWT secret for this backend process.'
 }
 
 if (-not $env:TMDT_MAIL_USERNAME) {

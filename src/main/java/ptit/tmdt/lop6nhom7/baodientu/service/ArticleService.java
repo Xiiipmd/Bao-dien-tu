@@ -53,7 +53,6 @@ public class ArticleService {
     private final UserRepo userRepo;
     private final AnonymousReadMeterService anonymousReadMeterService;
     private final NewsNotificationService newsNotificationService;
-    private final Client geminiClient = new Client();
     private final List<String> geminiModels = List.of(
         "gemini-3.1-pro-preview",
         "gemini-2.5-pro",
@@ -89,7 +88,7 @@ public class ArticleService {
         // call gemini api
         for (String model : geminiModels) {
             try {
-                chatResponse = geminiClient.models.generateContent(model, prompt, null).text();
+                chatResponse = getGeminiClient().models.generateContent(model, prompt, null).text();
                 break;
             }
             catch (Exception e) {
@@ -125,8 +124,10 @@ public class ArticleService {
             .sapo(article.getSapo())
             .coverImage(article.getCoverImage())
             .previewContent(buildPreviewContent(article.getContent()))
-            .authorName(article.getAuthor().getFullName())
-            .categoryName(article.getCategory().getName())
+            .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
+            .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
+            .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
             .paywallRequired(true)
             .build();
@@ -236,9 +237,10 @@ public class ArticleService {
             .sapo(article.getSapo())
             .content(article.getContent())
             .coverImage(article.getCoverImage())
-            .authorName(article.getAuthor().getFullName())
+            .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
             .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
-            .categoryName(article.getCategory().getName())
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
+            .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
             .viewCount(article.getViewCount())
             .createdAt(article.getCreatedAt())
@@ -391,10 +393,16 @@ public class ArticleService {
             .coverImage(article.getCoverImage())
             .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
             .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
             .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
+            .viewCount(article.getViewCount() != null ? article.getViewCount() : 0)
             .createdAt(effectivePublishedAt(article))
             .build();
+    }
+
+    private Client getGeminiClient() {
+        return new Client();
     }
 
     private Instant effectivePublishedAt(Article article) {

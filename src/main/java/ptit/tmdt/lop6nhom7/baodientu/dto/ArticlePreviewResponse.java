@@ -12,7 +12,9 @@ public class ArticlePreviewResponse {
   private String sapo;
   private String coverImage;
   private String previewContent;
+  private Integer authorId;
   private String authorName;
+  private Integer categoryId;
   private String categoryName;
   private ArticleType type;
   private boolean paywallRequired;
