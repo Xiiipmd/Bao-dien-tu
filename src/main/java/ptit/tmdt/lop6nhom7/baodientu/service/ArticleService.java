@@ -8,6 +8,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -32,6 +35,7 @@ import ptit.tmdt.lop6nhom7.baodientu.entity.User;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 import ptit.tmdt.lop6nhom7.baodientu.enums.UserStatus;
+import ptit.tmdt.lop6nhom7.baodientu.enums.VipPreviewAccessMode;
 import ptit.tmdt.lop6nhom7.baodientu.exception.BadRequestException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.ForbiddenException;
 import ptit.tmdt.lop6nhom7.baodientu.exception.NotFoundException;
@@ -53,7 +57,6 @@ public class ArticleService {
     private final UserRepo userRepo;
     private final AnonymousReadMeterService anonymousReadMeterService;
     private final NewsNotificationService newsNotificationService;
-    private final Client geminiClient = new Client();
     private final List<String> geminiModels = List.of(
         "gemini-3.1-pro-preview",
         "gemini-2.5-pro",
@@ -89,7 +92,7 @@ public class ArticleService {
         // call gemini api
         for (String model : geminiModels) {
             try {
-                chatResponse = geminiClient.models.generateContent(model, prompt, null).text();
+                chatResponse = getGeminiClient().models.generateContent(model, prompt, null).text();
                 break;
             }
             catch (Exception e) {
@@ -111,6 +114,7 @@ public class ArticleService {
             .build();
     }
 
+    @Transactional(readOnly = true)
     public ArticlePreviewResponse getVipArticlePreview(int articleId) {
         Article article = articleRepo.findByIdAndStatus(articleId, ArticleStatus.PUBLISHED)
             .orElseThrow(() -> new NotFoundException("Không tìm thấy bài báo đang xuất bản"));
@@ -119,25 +123,39 @@ public class ArticleService {
             throw new BadRequestException("Chức năng preview chỉ áp dụng cho bài viết VIP");
         }
 
+        VipPreviewDecision previewDecision = resolveVipPreviewAccess(article);
+
         return ArticlePreviewResponse.builder()
             .id(article.getId())
             .title(article.getTitle())
             .sapo(article.getSapo())
             .coverImage(article.getCoverImage())
             .previewContent(buildPreviewContent(article.getContent()))
-            .authorName(article.getAuthor().getFullName())
-            .categoryName(article.getCategory().getName())
+            .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
+            .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
+            .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
             .paywallRequired(true)
+            .accessMode(previewDecision.accessMode())
+            .remainingFreeReads(previewDecision.remainingFreeReads())
+            .alreadyRead(previewDecision.alreadyRead())
+            .willConsumeFreeRead(previewDecision.willConsumeFreeRead())
             .build();
     }
 
             @Transactional(readOnly = true)
-            public List<ArticleSearchResponse> searchArticles(String keyword, Integer categoryId, String authorName) {
+            public List<ArticleSearchResponse> searchArticles(
+                String keyword,
+                Integer categoryId,
+                Integer authorId,
+                String authorName
+            ) {
             return articleRepo.searchPublishedArticles(
                 ArticleStatus.PUBLISHED,
                 normalizeQueryParam(keyword),
                 categoryId,
+                authorId,
                 normalizeQueryParam(authorName)
                 )
                 .stream()
@@ -228,7 +246,7 @@ public class ArticleService {
             }
         }
 
-        recordView(article, currentUser.orElse(null));
+        recordView(article, currentUser.orElse(null), anonymousReaderKey);
 
         return ArticleReadResponse.builder()
             .id(article.getId())
@@ -236,9 +254,10 @@ public class ArticleService {
             .sapo(article.getSapo())
             .content(article.getContent())
             .coverImage(article.getCoverImage())
-            .authorName(article.getAuthor().getFullName())
+            .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
             .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
-            .categoryName(article.getCategory().getName())
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
+            .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
             .viewCount(article.getViewCount())
             .createdAt(article.getCreatedAt())
@@ -320,16 +339,82 @@ public class ArticleService {
         return MeteredDecision.metered(result.remainingReads(), result.newlyConsumed());
     }
 
-    private void recordView(Article article, User user) {
+    private VipPreviewDecision resolveVipPreviewAccess(Article article) {
+        Optional<User> currentUser = getCurrentUser();
+        if (currentUser.isEmpty()) {
+            return VipPreviewDecision.loginRequired();
+        }
+
+        User user = currentUser.get();
+        if (hasActiveVip(user)) {
+            return VipPreviewDecision.vip();
+        }
+        if (user.getStatus() == UserStatus.LOCKED) {
+            return VipPreviewDecision.paywall(0);
+        }
+
+        Instant startOfMonth = LocalDate.now()
+            .withDayOfMonth(1)
+            .atStartOfDay(ZoneId.systemDefault())
+            .toInstant();
+        Instant now = Instant.now();
+        boolean alreadyRead = articleViewRepo.existsByUserIdAndArticleIdAndViewedAtBetween(
+            user.getId(),
+            article.getId(),
+            startOfMonth,
+            now
+        );
+        long usedReads = articleViewRepo.countDistinctArticlesByUserAndTypeWithinPeriod(
+            user.getId(),
+            ArticleType.VIP,
+            startOfMonth,
+            now
+        );
+        int remaining = Math.max(0, MONTHLY_FREE_VIP_ARTICLE_LIMIT - (int) usedReads);
+
+        if (alreadyRead) {
+            return VipPreviewDecision.alreadyRead(remaining);
+        }
+        if (remaining > 0) {
+            return VipPreviewDecision.freeQuota(remaining);
+        }
+        return VipPreviewDecision.paywall(0);
+    }
+
+    private void recordView(Article article, User user, String anonymousReaderKey) {
+        String readerIdentity = user == null
+            ? hashReaderKey(normalizeAnonymousReaderKey(anonymousReaderKey))
+            : null;
+        boolean firstReaderView = user != null
+            ? !articleViewRepo.existsByUserIdAndArticleId(user.getId(), article.getId())
+            : !articleViewRepo.existsByArticleIdAndReaderIdentity(article.getId(), readerIdentity);
+
+        // Keep a page-view event for quota and analytics on every successful read.
         ArticleView articleView = new ArticleView();
         articleView.setArticle(article);
         articleView.setUser(user);
+        articleView.setReaderIdentity(readerIdentity);
         articleView.setViewedAt(Instant.now());
         articleViewRepo.save(articleView);
+
+        // The public counter represents unique readers, not repeated opens.
+        if (!firstReaderView) {
+            return;
+        }
 
         article.setViewCount((article.getViewCount() == null ? 0 : article.getViewCount()) + 1);
         articleRepo.save(article);
         newsNotificationService.notifyIfHot(article);
+    }
+
+    private String hashReaderKey(String readerKey) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(readerKey.getBytes(StandardCharsets.UTF_8));
+            return "DEVICE:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 
     private Optional<User> getCurrentUser() {
@@ -391,10 +476,16 @@ public class ArticleService {
             .coverImage(article.getCoverImage())
             .authorId(article.getAuthor() != null ? article.getAuthor().getId() : null)
             .authorName(article.getAuthor() != null ? article.getAuthor().getFullName() : null)
+            .categoryId(article.getCategory() != null ? article.getCategory().getId() : null)
             .categoryName(article.getCategory() != null ? article.getCategory().getName() : null)
             .type(article.getType())
+            .viewCount(article.getViewCount() != null ? article.getViewCount() : 0)
             .createdAt(effectivePublishedAt(article))
             .build();
+    }
+
+    private Client getGeminiClient() {
+        return new Client();
     }
 
     private Instant effectivePublishedAt(Article article) {
@@ -408,6 +499,53 @@ public class ArticleService {
 
         private static MeteredDecision metered(int remainingFreeReads, boolean newlyConsumed) {
             return new MeteredDecision(true, remainingFreeReads, newlyConsumed);
+        }
+    }
+
+    private record VipPreviewDecision(
+        VipPreviewAccessMode accessMode,
+        Integer remainingFreeReads,
+        boolean alreadyRead,
+        boolean willConsumeFreeRead
+    ) {
+        private static VipPreviewDecision vip() {
+            return new VipPreviewDecision(VipPreviewAccessMode.VIP, null, false, false);
+        }
+
+        private static VipPreviewDecision freeQuota(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.FREE_QUOTA,
+                remainingFreeReads,
+                false,
+                true
+            );
+        }
+
+        private static VipPreviewDecision alreadyRead(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.ALREADY_READ,
+                remainingFreeReads,
+                true,
+                false
+            );
+        }
+
+        private static VipPreviewDecision paywall(int remainingFreeReads) {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.PAYWALL,
+                remainingFreeReads,
+                false,
+                false
+            );
+        }
+
+        private static VipPreviewDecision loginRequired() {
+            return new VipPreviewDecision(
+                VipPreviewAccessMode.LOGIN_REQUIRED,
+                null,
+                false,
+                false
+            );
         }
     }
 

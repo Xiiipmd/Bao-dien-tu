@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ChangePasswordRequest;
+import ptit.tmdt.lop6nhom7.baodientu.dto.UpdateAvatarRequest;
 import ptit.tmdt.lop6nhom7.baodientu.dto.UpdateUserProfileRequest;
 import ptit.tmdt.lop6nhom7.baodientu.dto.UserProfileResponse;
 import ptit.tmdt.lop6nhom7.baodientu.service.UserAccountService;
@@ -36,6 +37,14 @@ public class UserAccountController {
   ) {
     userAccountService.changePassword(userId(authentication), request);
     return ResponseEntity.noContent().build();
+  }
+
+  @PatchMapping("/avatar")
+  public ResponseEntity<UserProfileResponse> updateAvatar(
+      Authentication authentication,
+      @Valid @RequestBody UpdateAvatarRequest request
+  ) {
+    return ResponseEntity.ok(userAccountService.updateAvatar(userId(authentication), request));
   }
 
   private Integer userId(Authentication authentication) {

@@ -1,6 +1,7 @@
 package ptit.tmdt.lop6nhom7.baodientu.service;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ptit.tmdt.lop6nhom7.baodientu.dto.NewsNotificationResponse;
@@ -21,10 +22,11 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class NewsNotificationService {
-  public static final int HOT_VIEW_THRESHOLD = 10;
-
   private final NewsNotificationRepo notificationRepo;
   private final UserRepo userRepo;
+
+  @Value("${app.notifications.hot-view-threshold:1000}")
+  private int hotViewThreshold;
 
   @Transactional
   public int notifyNewArticle(Article article) {
@@ -34,7 +36,7 @@ public class NewsNotificationService {
   @Transactional
   public int notifyIfHot(Article article) {
     int views = article.getViewCount() == null ? 0 : article.getViewCount();
-    if (views < HOT_VIEW_THRESHOLD) {
+    if (views < hotViewThreshold) {
       return 0;
     }
     int readerNotifications = createNotifications(article, NotificationType.HOT_ARTICLE);
@@ -206,6 +208,7 @@ public class NewsNotificationService {
         article.getId(),
         article.getCoverImage(),
         article.getCategory().getName(),
+        article.getType(),
         notification.getType(),
         notification.getTitle(),
         notification.getMessage(),

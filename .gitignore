@@ -35,3 +35,6 @@ build/
 hs_err_pid14548.log
 
 *.pdf
+
+# Local runtime secret generated/reused by run-backend-azure.ps1
+.tmdt-jwt-secret

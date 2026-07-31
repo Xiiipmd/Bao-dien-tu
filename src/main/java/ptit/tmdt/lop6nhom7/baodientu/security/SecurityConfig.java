@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/articles/search").permitAll()
                         .requestMatchers("/api/articles/home").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/articles/*/comments").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
                         .requestMatchers("/api/transactions/vnpay-return").permitAll()

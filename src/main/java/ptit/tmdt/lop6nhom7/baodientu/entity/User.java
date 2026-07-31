@@ -45,6 +45,10 @@ public class User {
   
   @Column(name = "vip_expiry_date")
   private Instant vipExpiryDate;
+
+  @Size(max = 500)
+  @Column(name = "avatar_url", length = 500)
+  private String avatarUrl;
   
   @ColumnDefault("3")
   @Column(name = "free_articles_left")

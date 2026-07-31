@@ -28,6 +28,7 @@ import ptit.tmdt.lop6nhom7.baodientu.service.ArticleService;
 @Slf4j
 public class ArticleController {
     private static final String ANONYMOUS_READER_COOKIE = "bdt_reader_key";
+    private static final String ANONYMOUS_READER_HEADER = "X-Anonymous-Reader-Key";
 
     private final ArticleService articleService;
     private final AnonymousReadMeterService anonymousReadMeterService;
@@ -50,9 +51,10 @@ public class ArticleController {
     public ResponseEntity<java.util.List<ArticleSearchResponse>> searchArticles(
         @RequestParam(value = "keyword", required = false) String keyword,
         @RequestParam(value = "categoryId", required = false) Integer categoryId,
+        @RequestParam(value = "authorId", required = false) Integer authorId,
         @RequestParam(value = "authorName", required = false) String authorName
     ) {
-        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorName));
+        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorId, authorName));
     }
 
     @GetMapping("/personalized")
@@ -77,6 +79,11 @@ public class ArticleController {
     }
 
     private String resolveReaderKey(HttpServletRequest request, HttpServletResponse response) {
+        String headerKey = request.getHeader(ANONYMOUS_READER_HEADER);
+        if (headerKey != null && !headerKey.isBlank()) {
+            return headerKey.trim();
+        }
+
         Cookie[] cookies = request.getCookies();
         if (cookies != null) {
             for (Cookie cookie : cookies) {

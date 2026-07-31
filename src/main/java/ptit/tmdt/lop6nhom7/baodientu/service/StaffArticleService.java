@@ -35,32 +35,31 @@ public class StaffArticleService {
     private final NewsNotificationService newsNotificationService;
 
     @Transactional
-    public void createArticle(ArticleDTO articleDTO) {
-        if (articleDTO == null) {
+    public ArticleDTO createArticle(ArticleUpdateRequest request, boolean submitForReview) {
+        if (request == null) {
             throw new BadRequestException("Article data is required");
         }
-        if (articleDTO.getId() != null) {
-            throw new BadRequestException("Article id must be null for creation");
-        }
 
-        User author = userRepo.findById(articleDTO.getAuthorId())
-            .orElseThrow(() -> new NotFoundException("Không tìm thấy người dùng"));
-        Category category = categoryRepo.findById(articleDTO.getCategoryId())
+        User author = getCurrentUser();
+        if (author.getRole() != UserRole.AUTHOR) {
+            throw new ForbiddenException("Chỉ tài khoản tác giả được tạo bài viết");
+        }
+        Category category = categoryRepo.findById(request.getCategoryId())
             .orElseThrow(() -> new NotFoundException("Không tìm thấy thể loại"));
 
-        Article article = articleDTO.toArticle();
+        Article article = new Article();
         article.setAuthor(author);
         article.setCategory(category);
-        article.setStatus(ArticleStatus.PENDING);
-        if (article.getViewCount() == null) {
-            article.setViewCount(0);
-        }
-        if (article.getCreatedAt() == null) {
-            article.setCreatedAt(Instant.now());
-        }
+        applyEditableFields(article, request);
+        article.setStatus(submitForReview ? ArticleStatus.PENDING : ArticleStatus.DRAFT);
+        article.setViewCount(0);
+        article.setCreatedAt(Instant.now());
 
         Article savedArticle = articleRepo.save(article);
-        newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, false);
+        if (submitForReview) {
+            newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, false);
+        }
+        return toDto(savedArticle);
     }
 
     @Transactional(readOnly = true)
@@ -98,6 +97,7 @@ public class StaffArticleService {
         if (article.getStatus() == ArticleStatus.HIDDEN) {
             throw new ForbiddenException("Bạn không thể chỉnh sửa bài viết này do đã bị khóa hoặc gỡ khỏi hệ thống");
         }
+        assertAuthorCanEdit(article, currentUser);
 
         return toDto(article);
     }
@@ -120,29 +120,59 @@ public class StaffArticleService {
         if (article.getStatus() == ArticleStatus.HIDDEN) {
             throw new ForbiddenException("Bạn không thể chỉnh sửa bài viết này do đã bị khóa hoặc gỡ khỏi hệ thống");
         }
+        assertAuthorCanEdit(article, currentUser);
 
         Category category = categoryRepo.findById(request.getCategoryId())
             .orElseThrow(() -> new NotFoundException("Không tìm thấy thể loại"));
 
         article.setCategory(category);
+        applyEditableFields(article, request);
+
+        Article savedArticle = articleRepo.save(article);
+        return toDto(savedArticle);
+    }
+
+    @Transactional
+    public ArticleDTO submitArticle(Integer articleId) {
+        Article article = articleRepo.findById(articleId)
+            .orElseThrow(() -> new NotFoundException("Không tìm thấy bài viết"));
+        User currentUser = getCurrentUser();
+
+        if (currentUser.getRole() != UserRole.AUTHOR
+                || !Objects.equals(article.getAuthor().getId(), currentUser.getId())) {
+            throw new ForbiddenException("Tác giả chỉ được gửi duyệt bài viết của chính mình");
+        }
+        if (article.getStatus() != ArticleStatus.DRAFT
+                && article.getStatus() != ArticleStatus.REJECTED) {
+            throw new BadRequestException("Chỉ bản nháp hoặc bài bị từ chối mới có thể gửi duyệt");
+        }
+
+        boolean resubmitted = article.getStatus() == ArticleStatus.REJECTED;
+        article.setStatus(ArticleStatus.PENDING);
+        article.setRejectionReason(null);
+        Article savedArticle = articleRepo.save(article);
+        newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, resubmitted);
+        return toDto(savedArticle);
+    }
+
+    private void assertAuthorCanEdit(Article article, User currentUser) {
+        if (currentUser.getRole() != UserRole.AUTHOR) {
+            return;
+        }
+        if (article.getStatus() == ArticleStatus.PENDING) {
+            throw new ForbiddenException("Bài viết đang chờ duyệt, chưa thể chỉnh sửa");
+        }
+        if (article.getStatus() == ArticleStatus.PUBLISHED) {
+            throw new ForbiddenException("Bài đã xuất bản phải tạo phiên bản mới để duyệt lại");
+        }
+    }
+
+    private void applyEditableFields(Article article, ArticleUpdateRequest request) {
         article.setCoverImage(request.getCoverImage().trim());
         article.setTitle(request.getTitle().trim());
         article.setSapo(request.getSapo().trim());
         article.setContent(request.getContent().trim());
         article.setType(request.getType());
-
-        boolean resubmitted = article.getStatus() == ArticleStatus.REJECTED
-                && currentUser.getRole() == UserRole.AUTHOR;
-        if (resubmitted) {
-            article.setStatus(ArticleStatus.PENDING);
-            article.setRejectionReason(null);
-        }
-
-        Article savedArticle = articleRepo.save(article);
-        if (resubmitted) {
-            newsNotificationService.notifyModeratorsAboutSubmission(savedArticle, true);
-        }
-        return toDto(savedArticle);
     }
 
     private User getCurrentUser() {

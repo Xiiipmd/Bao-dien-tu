@@ -21,6 +21,11 @@ public interface UserRepo extends JpaRepository<User, Integer> {
   boolean existsByEmail(@NotBlank(message = "Email khong duoc bo trong") @Email String email);
   boolean existsByEmailIgnoreCaseAndIdNot(String email, Integer id);
   List<User> findByRoleOrderByFullNameAsc(UserRole role);
+  List<User> findAllByOrderByCreatedAtDesc();
+  List<User> findByFullNameContainingIgnoreCaseOrEmailContainingIgnoreCaseOrderByCreatedAtDesc(
+      String fullName,
+      String email
+  );
 
   @EntityGraph(attributePaths = "preferredCategories")
   List<User> findAll();
@@ -35,7 +40,7 @@ public interface UserRepo extends JpaRepository<User, Integer> {
       where (u.status is null or u.status <> :lockedStatus)
         and u.pushNotificationsEnabled = true
         and u.id <> :authorId
-        and (u.preferredCategories is empty or :category member of u.preferredCategories)
+        and :category member of u.preferredCategories
       """)
   List<User> findNewsNotificationRecipients(
       @org.springframework.data.repository.query.Param("category") Category category,

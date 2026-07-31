@@ -15,5 +15,6 @@ public class VipPackageResponse {
     private String     name;
     private Integer    durationDays;
     private BigDecimal price;
+    private Integer    discountPercent;
     private String     description;
 }

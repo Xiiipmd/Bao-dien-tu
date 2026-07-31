@@ -15,6 +15,14 @@ import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 
 @Repository
 public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
+    boolean existsByUserIdAndArticleId(
+            Integer userId,
+            Integer articleId);
+
+    boolean existsByArticleIdAndReaderIdentity(
+            Integer articleId,
+            String readerIdentity);
+
     boolean existsByUserIdAndArticleIdAndViewedAtBetween(
             Integer userId,
             Integer articleId,

@@ -5,6 +5,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ChangePasswordRequest;
+import ptit.tmdt.lop6nhom7.baodientu.dto.UpdateAvatarRequest;
 import ptit.tmdt.lop6nhom7.baodientu.dto.UpdateUserProfileRequest;
 import ptit.tmdt.lop6nhom7.baodientu.dto.UserProfileResponse;
 import ptit.tmdt.lop6nhom7.baodientu.entity.User;
@@ -59,6 +60,13 @@ public class UserAccountService {
     userRepo.save(user);
   }
 
+  @Transactional
+  public UserProfileResponse updateAvatar(Integer userId, UpdateAvatarRequest request) {
+    User user = getUser(userId);
+    user.setAvatarUrl(request.avatar().trim());
+    return toResponse(userRepo.save(user));
+  }
+
   private User getUser(Integer userId) {
     return userRepo.findById(userId)
         .orElseThrow(() -> new NotFoundException("Không tìm thấy tài khoản"));
@@ -71,7 +79,8 @@ public class UserAccountService {
         user.getEmail(),
         user.getRole(),
         user.getVipExpiryDate(),
-        user.getCreatedAt()
+        user.getCreatedAt(),
+        user.getAvatarUrl()
     );
   }
 }
