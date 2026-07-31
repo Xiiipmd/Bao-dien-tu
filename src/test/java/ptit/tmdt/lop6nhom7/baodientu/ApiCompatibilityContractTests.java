@@ -58,7 +58,8 @@ class ApiCompatibilityContractTests {
         Instant.parse("2026-12-31T00:00:00Z"),
         3,
         9,
-        "reader@example.com"
+        "reader@example.com",
+        "/api/media/7"
     );
     VipPackageResponse vipPackage = VipPackageResponse.builder()
         .price(new BigDecimal("59000"))
@@ -68,6 +69,7 @@ class ApiCompatibilityContractTests {
     assertAll(
         () -> assertEquals(9, login.getId()),
         () -> assertEquals("reader@example.com", login.getEmail()),
+        () -> assertEquals("/api/media/7", login.getAvatar()),
         () -> assertEquals(10, vipPackage.getDiscountPercent())
     );
   }

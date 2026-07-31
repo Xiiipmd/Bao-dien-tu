@@ -24,15 +24,22 @@ if (-not $env:TMDT_DB_PASSWORD) {
 }
 
 if (-not $env:TMDT_JWT_SECRET) {
-  $jwtSecretBytes = New-Object byte[] 32
-  $randomGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
-  try {
-    $randomGenerator.GetBytes($jwtSecretBytes)
-    $env:TMDT_JWT_SECRET = [Convert]::ToBase64String($jwtSecretBytes)
-  } finally {
-    $randomGenerator.Dispose()
+  $localJwtSecretPath = Join-Path $repoRoot '.tmdt-jwt-secret'
+  if (Test-Path -LiteralPath $localJwtSecretPath) {
+    $env:TMDT_JWT_SECRET = (Get-Content -LiteralPath $localJwtSecretPath -Raw).Trim()
+    Write-Host 'Reusing the local JWT secret.'
+  } else {
+    $jwtSecretBytes = New-Object byte[] 32
+    $randomGenerator = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try {
+      $randomGenerator.GetBytes($jwtSecretBytes)
+      $env:TMDT_JWT_SECRET = [Convert]::ToBase64String($jwtSecretBytes)
+      [IO.File]::WriteAllText($localJwtSecretPath, $env:TMDT_JWT_SECRET)
+    } finally {
+      $randomGenerator.Dispose()
+    }
+    Write-Host 'Generated and saved a local JWT secret excluded from Git.'
   }
-  Write-Host 'Generated a temporary JWT secret for this backend process.'
 }
 
 if (-not $env:TMDT_MAIL_USERNAME) {

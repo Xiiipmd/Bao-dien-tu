@@ -29,7 +29,7 @@ public class SubscriptionService {
 
   @Transactional(readOnly = true)
   public List<SubscriptionResponse> getMySubscriptions() {
-    User currentUser = vipAccessService.requireCurrentVipUser();
+    User currentUser = requireActiveUser();
     return subscriptionRepo.findByUserOrderByIdDesc(currentUser)
         .stream()
         .map(this::toResponse)
@@ -38,7 +38,7 @@ public class SubscriptionService {
 
   @Transactional
   public SubscriptionResponse subscribe(SubscriptionRequest request) {
-    User currentUser = vipAccessService.requireCurrentVipUser();
+    User currentUser = requireActiveUser();
     validateTarget(request.targetType(), request.targetId());
 
     return subscriptionRepo.findByUserAndTargetTypeAndTargetId(
@@ -58,7 +58,7 @@ public class SubscriptionService {
 
   @Transactional
   public void unsubscribe(String rawTargetType, Integer targetId) {
-    User currentUser = vipAccessService.requireCurrentVipUser();
+    User currentUser = requireActiveUser();
     SubscriptionTargetType targetType = parseTargetType(rawTargetType);
 
     Subscription subscription = subscriptionRepo.findByUserAndTargetTypeAndTargetId(
@@ -69,6 +69,16 @@ public class SubscriptionService {
         .orElseThrow(() -> new NotFoundException("Khong tim thay dang ky theo doi can huy"));
 
     subscriptionRepo.delete(subscription);
+  }
+
+  private User requireActiveUser() {
+    User user = vipAccessService.requireCurrentUser();
+    if (user.getStatus() == ptit.tmdt.lop6nhom7.baodientu.enums.UserStatus.LOCKED) {
+      throw new ptit.tmdt.lop6nhom7.baodientu.exception.ForbiddenException(
+          "Nguoi dung bi khoa tai khoan"
+      );
+    }
+    return user;
   }
 
   private void validateTarget(SubscriptionTargetType targetType, Integer targetId) {

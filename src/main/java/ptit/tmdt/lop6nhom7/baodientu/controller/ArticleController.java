@@ -51,9 +51,10 @@ public class ArticleController {
     public ResponseEntity<java.util.List<ArticleSearchResponse>> searchArticles(
         @RequestParam(value = "keyword", required = false) String keyword,
         @RequestParam(value = "categoryId", required = false) Integer categoryId,
+        @RequestParam(value = "authorId", required = false) Integer authorId,
         @RequestParam(value = "authorName", required = false) String authorName
     ) {
-        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorName));
+        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorId, authorName));
     }
 
     @GetMapping("/personalized")

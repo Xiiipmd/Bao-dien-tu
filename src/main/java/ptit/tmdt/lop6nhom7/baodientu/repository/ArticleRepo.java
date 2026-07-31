@@ -35,6 +35,7 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       where a.status = :status
         and (:keyword is null or trim(:keyword) = '' or lower(a.title) like lower(concat('%', :keyword, '%')))
         and (:categoryId is null or a.category.id = :categoryId)
+        and (:authorId is null or a.author.id = :authorId)
         and (:authorName is null or trim(:authorName) = '' or lower(a.author.fullName) like lower(concat('%', :authorName, '%')))
       order by a.publishedAt desc
       """)
@@ -42,6 +43,7 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       @Param("status") ArticleStatus status,
       @Param("keyword") String keyword,
       @Param("categoryId") Integer categoryId,
+      @Param("authorId") Integer authorId,
       @Param("authorName") String authorName
   );
 

@@ -8,6 +8,9 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -142,11 +145,17 @@ public class ArticleService {
     }
 
             @Transactional(readOnly = true)
-            public List<ArticleSearchResponse> searchArticles(String keyword, Integer categoryId, String authorName) {
+            public List<ArticleSearchResponse> searchArticles(
+                String keyword,
+                Integer categoryId,
+                Integer authorId,
+                String authorName
+            ) {
             return articleRepo.searchPublishedArticles(
                 ArticleStatus.PUBLISHED,
                 normalizeQueryParam(keyword),
                 categoryId,
+                authorId,
                 normalizeQueryParam(authorName)
                 )
                 .stream()
@@ -237,7 +246,7 @@ public class ArticleService {
             }
         }
 
-        recordView(article, currentUser.orElse(null));
+        recordView(article, currentUser.orElse(null), anonymousReaderKey);
 
         return ArticleReadResponse.builder()
             .id(article.getId())
@@ -372,16 +381,40 @@ public class ArticleService {
         return VipPreviewDecision.paywall(0);
     }
 
-    private void recordView(Article article, User user) {
+    private void recordView(Article article, User user, String anonymousReaderKey) {
+        String readerIdentity = user == null
+            ? hashReaderKey(normalizeAnonymousReaderKey(anonymousReaderKey))
+            : null;
+        boolean firstReaderView = user != null
+            ? !articleViewRepo.existsByUserIdAndArticleId(user.getId(), article.getId())
+            : !articleViewRepo.existsByArticleIdAndReaderIdentity(article.getId(), readerIdentity);
+
+        // Keep a page-view event for quota and analytics on every successful read.
         ArticleView articleView = new ArticleView();
         articleView.setArticle(article);
         articleView.setUser(user);
+        articleView.setReaderIdentity(readerIdentity);
         articleView.setViewedAt(Instant.now());
         articleViewRepo.save(articleView);
+
+        // The public counter represents unique readers, not repeated opens.
+        if (!firstReaderView) {
+            return;
+        }
 
         article.setViewCount((article.getViewCount() == null ? 0 : article.getViewCount()) + 1);
         articleRepo.save(article);
         newsNotificationService.notifyIfHot(article);
+    }
+
+    private String hashReaderKey(String readerKey) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256")
+                .digest(readerKey.getBytes(StandardCharsets.UTF_8));
+            return "DEVICE:" + java.util.HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 is unavailable", ex);
+        }
     }
 
     private Optional<User> getCurrentUser() {

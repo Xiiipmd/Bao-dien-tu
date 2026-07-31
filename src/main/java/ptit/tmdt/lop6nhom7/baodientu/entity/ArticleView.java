@@ -26,6 +26,13 @@ public class ArticleView {
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "user_id")
   private User user;
+
+  /**
+   * Stable, privacy-safe identity for an anonymous reader. Authenticated
+   * readers are deduplicated through user_id, so this value stays null.
+   */
+  @Column(name = "reader_identity", length = 80)
+  private String readerIdentity;
   
   @ColumnDefault("CURRENT_TIMESTAMP")
   @Column(name = "viewed_at")

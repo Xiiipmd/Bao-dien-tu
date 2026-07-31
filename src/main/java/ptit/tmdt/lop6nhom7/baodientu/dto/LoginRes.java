@@ -16,4 +16,5 @@ public class LoginRes {
   private int freeArticlesLeft;
   private Integer id;
   private String email;
+  private String avatar;
 }

@@ -10,5 +10,6 @@ public record UserProfileResponse(
     String email,
     UserRole role,
     Instant vipExpiryDate,
-    Instant createdAt
+    Instant createdAt,
+    String avatar
 ) {}

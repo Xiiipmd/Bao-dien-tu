@@ -46,10 +46,25 @@ public class StaffArticleController {
 
     @PostMapping("/create")
     @PreAuthorize("hasRole('AUTHOR')")
-    public ResponseEntity<Void> createNewArticle(@Valid @RequestBody ArticleDTO articleDTO) {
-        log.info("Creating new article with title: {}", articleDTO.getTitle());
-        staffArticleService.createArticle(articleDTO);
-        return ResponseEntity.status(HttpStatus.CREATED).build();
+    public ResponseEntity<ArticleDTO> createNewArticle(@Valid @RequestBody ArticleUpdateRequest request) {
+        log.info("Creating and submitting a new article with title: {}", request.getTitle());
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(staffArticleService.createArticle(request, true));
+    }
+
+    @PostMapping("/drafts")
+    @PreAuthorize("hasRole('AUTHOR')")
+    public ResponseEntity<ArticleDTO> createDraft(@Valid @RequestBody ArticleUpdateRequest request) {
+        log.info("Creating an article draft with title: {}", request.getTitle());
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(staffArticleService.createArticle(request, false));
+    }
+
+    @PostMapping("/{articleId}/submit")
+    @PreAuthorize("hasRole('AUTHOR')")
+    public ResponseEntity<ArticleDTO> submitArticle(@PathVariable Integer articleId) {
+        log.info("Submitting article with id={}", articleId);
+        return ResponseEntity.ok(staffArticleService.submitArticle(articleId));
     }
 
     @PutMapping("/{articleId}")

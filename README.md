@@ -62,7 +62,13 @@ TMDT_MAIL_PASSWORD
 GEMINI_API_KEY
 ```
 
-Nếu chưa có `TMDT_JWT_SECRET`, script tạo một khóa JWT ngẫu nhiên chỉ cho tiến trình hiện tại. Muốn token đăng nhập còn hiệu lực sau khi khởi động lại backend, hãy đặt một khóa riêng trong biến môi trường và tuyệt đối không commit khóa đó.
+Ngưỡng lượt xem để tạo thông báo “Tin đang hot” mặc định là `1000`. Có thể điều chỉnh riêng cho môi trường phát triển:
+
+```powershell
+$env:TMDT_HOT_VIEW_THRESHOLD="1000"
+```
+
+Nếu chưa có `TMDT_JWT_SECRET`, script tạo khóa JWT một lần trong file `.tmdt-jwt-secret` và tái sử dụng ở những lần chạy sau. File này đã nằm trong `.gitignore`; không xóa hoặc commit file nếu muốn token đăng nhập vẫn còn hiệu lực sau khi khởi động lại backend. Môi trường triển khai thật nên cấp khóa qua biến môi trường.
 
 Riêng `TMDT_DB_PASSWORD` không được lưu trong GitHub. Khi chạy, script sẽ hỏi mật khẩu Azure MySQL. Nếu không muốn nhập lại mỗi lần, có thể set trước trong terminal:
 
@@ -102,3 +108,38 @@ VNPAY_URL
 VNPAY_RETURN_URL
 VNPAY_IPN_URL
 ```
+
+## Luồng tác giả và kiểm duyệt
+
+Người dùng tự đăng ký luôn nhận role `MEMBER`. Role `AUTHOR`, `CENSOR` hoặc `ADMIN` chỉ được cấp bởi quản trị viên.
+
+Các endpoint tác nghiệp chính:
+
+```text
+GET  /api/staff/articles
+POST /api/staff/articles/drafts
+POST /api/staff/articles/create
+PUT  /api/staff/articles/{articleId}
+POST /api/staff/articles/{articleId}/submit
+
+GET  /api/moderation/articles/pending
+GET  /api/moderation/articles/{articleId}
+POST /api/moderation/articles/{articleId}/decision
+GET  /api/moderation/articles/visibility
+POST /api/moderation/articles/{articleId}/hide
+POST /api/moderation/articles/{articleId}/show
+
+GET   /api/admin/users
+PATCH /api/admin/users/{userId}/role
+PATCH /api/admin/users/{userId}/status
+
+PATCH /api/me/account/avatar
+POST /api/media
+GET  /api/media/{assetId}
+```
+
+Backend luôn lấy tác giả từ JWT, không nhận `authorId` do client tự khai báo. Tác giả chỉ sửa được bài của mình ở trạng thái `DRAFT` hoặc `REJECTED`; bài `PENDING`, `PUBLISHED` và `HIDDEN` không được sửa trực tiếp.
+
+Ảnh tải lên qua `POST /api/media` được giới hạn 5 MB và lưu trong bảng `media_assets` để các backend cùng kết nối Azure MySQL có thể truy cập. Mọi tài khoản đã đăng nhập có thể tải ảnh đại diện; endpoint đọc ảnh là công khai để ứng dụng hiển thị ảnh bài báo và avatar.
+
+JWT mặc định có hiệu lực 30 ngày và có thể cấu hình bằng `TMDT_JWT_EXPIRATION_MS`. `TMDT_JWT_SECRET` phải giữ ổn định giữa các lần khởi động backend, nếu thay khóa thì các phiên đăng nhập cũ sẽ mất hiệu lực.

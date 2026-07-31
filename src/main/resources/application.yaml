@@ -1,4 +1,8 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   application:
     name: baodientu
 
@@ -36,7 +40,9 @@ logging:
 app:
   jwt:
     secret: ${TMDT_JWT_SECRET}
-    expiration: 86400000
+    expiration: ${TMDT_JWT_EXPIRATION_MS:2592000000}
+  notifications:
+    hot-view-threshold: ${TMDT_HOT_VIEW_THRESHOLD:1000}
 
 vnpay:
   tmn-code: ${VNPAY_TMN_CODE:}
