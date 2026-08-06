@@ -54,13 +54,23 @@ public class ArticleController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<java.util.List<ArticleSearchResponse>> searchArticles(
+    public ResponseEntity<Object> searchArticles(
         @RequestParam(value = "keyword", required = false) String keyword,
         @RequestParam(value = "categoryId", required = false) Integer categoryId,
         @RequestParam(value = "authorId", required = false) Integer authorId,
-        @RequestParam(value = "authorName", required = false) String authorName
+        @RequestParam(value = "authorName", required = false) String authorName,
+        @RequestParam(value = "sourceName", required = false) String sourceName,
+        @RequestParam(value = "origin", required = false) ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin,
+        @RequestParam(value = "page", required = false) Integer page,
+        @RequestParam(value = "size", required = false) Integer size
     ) {
-        return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorId, authorName));
+        if (page == null && size == null) {
+            return ResponseEntity.ok(articleService.searchArticles(keyword, categoryId, authorId, authorName, sourceName, origin));
+        }
+        int pageVal = page == null ? 0 : page;
+        int sizeVal = size == null ? 15 : size;
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(pageVal, sizeVal);
+        return ResponseEntity.ok(articleService.searchArticlesPage(keyword, categoryId, authorId, authorName, sourceName, origin, pageable));
     }
 
     @GetMapping("/personalized")

@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ErrorResponse;
 
 import java.util.stream.Collectors;
@@ -65,6 +66,15 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(ErrorResponse.of(400, message));
+  }
+
+  @ExceptionHandler(ResponseStatusException.class)
+  public ResponseEntity<ErrorResponse> handleResponseStatus(ResponseStatusException ex) {
+    int status = ex.getStatusCode().value();
+    String message = ex.getReason() == null ? "Yêu cầu không thể xử lý" : ex.getReason();
+    return ResponseEntity
+        .status(ex.getStatusCode())
+        .body(ErrorResponse.of(status, message));
   }
   
   // Catch-all — unexpected exceptions

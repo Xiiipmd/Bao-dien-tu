@@ -44,9 +44,11 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/articles/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/utilities/**").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
                         .requestMatchers("/api/transactions/vnpay-return").permitAll()
                         .requestMatchers("/api/transactions/vnpay-ipn").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/rss/import").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex

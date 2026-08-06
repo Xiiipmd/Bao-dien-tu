@@ -39,6 +39,8 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
         and (:categoryId is null or a.category.id = :categoryId)
         and (:authorId is null or a.author.id = :authorId)
         and (:authorName is null or trim(:authorName) = '' or lower(a.author.fullName) like lower(concat('%', :authorName, '%')))
+        and (:sourceName is null or trim(:sourceName) = '' or lower(a.sourceName) like lower(concat('%', :sourceName, '%')))
+        and (:origin is null or a.origin = :origin or (:origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL and a.origin is null))
       order by a.publishedAt desc
       """)
   List<Article> searchPublishedArticles(
@@ -46,13 +48,55 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       @Param("keyword") String keyword,
       @Param("categoryId") Integer categoryId,
       @Param("authorId") Integer authorId,
-      @Param("authorName") String authorName
+      @Param("authorName") String authorName,
+      @Param("sourceName") String sourceName,
+      @Param("origin") ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin
   );
+
+  @Query(value = """
+      select a
+      from Article a
+      join fetch a.author
+      join fetch a.category
+      where a.status = :status
+        and (:keyword is null or trim(:keyword) = '' or lower(a.title) like lower(concat('%', :keyword, '%')))
+        and (:categoryId is null or a.category.id = :categoryId)
+        and (:authorId is null or a.author.id = :authorId)
+        and (:authorName is null or trim(:authorName) = '' or lower(a.author.fullName) like lower(concat('%', :authorName, '%')))
+        and (:sourceName is null or trim(:sourceName) = '' or lower(a.sourceName) like lower(concat('%', :sourceName, '%')))
+        and (:origin is null or a.origin = :origin or (:origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL and a.origin is null))
+      order by a.publishedAt desc
+      """,
+      countQuery = """
+      select count(a)
+      from Article a
+      where a.status = :status
+        and (:keyword is null or trim(:keyword) = '' or lower(a.title) like lower(concat('%', :keyword, '%')))
+        and (:categoryId is null or a.category.id = :categoryId)
+        and (:authorId is null or a.author.id = :authorId)
+        and (:authorName is null or trim(:authorName) = '' or lower(a.author.fullName) like lower(concat('%', :authorName, '%')))
+        and (:sourceName is null or trim(:sourceName) = '' or lower(a.sourceName) like lower(concat('%', :sourceName, '%')))
+        and (:origin is null or a.origin = :origin or (:origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL and a.origin is null))
+      """)
+  org.springframework.data.domain.Page<Article> searchPublishedArticlesPage(
+      @Param("status") ArticleStatus status,
+      @Param("keyword") String keyword,
+      @Param("categoryId") Integer categoryId,
+      @Param("authorId") Integer authorId,
+      @Param("authorName") String authorName,
+      @Param("sourceName") String sourceName,
+      @Param("origin") ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin,
+      Pageable pageable
+  );
+
+  boolean existsByExternalId(String externalId);
+  boolean existsByOriginalUrl(String originalUrl);
 
   @Query("""
       select a
       from Article a
       where a.status = :status
+        and (a.origin is null or a.origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL)
       order by a.publishedAt desc
       """)
   @EntityGraph(attributePaths = {"author", "category"})
@@ -64,6 +108,7 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       join fetch a.author
       join fetch a.category
       where a.status = :status
+        and (a.origin is null or a.origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL)
       order by a.publishedAt desc
       """)
   List<Article> findHomeArticles(
@@ -78,6 +123,7 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       join fetch a.category
       where a.status = :status
         and a.category.id in :categoryIds
+        and (a.origin is null or a.origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL)
       order by a.publishedAt desc
       """)
   List<Article> findPreferredHomeArticles(
@@ -93,6 +139,7 @@ public interface ArticleRepo extends JpaRepository<Article, Integer> {
       join fetch a.category
       where a.status = :status
         and a.category.id not in :categoryIds
+        and (a.origin is null or a.origin = ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin.INTERNAL)
       order by a.publishedAt desc
       """)
   List<Article> findNonPreferredHomeArticles(

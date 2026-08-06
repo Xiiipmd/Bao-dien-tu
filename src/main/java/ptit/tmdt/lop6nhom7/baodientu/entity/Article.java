@@ -6,6 +6,7 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 import org.hibernate.annotations.ColumnDefault;
+import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleStatus;
 import ptit.tmdt.lop6nhom7.baodientu.enums.ArticleType;
 
@@ -73,6 +74,22 @@ public class Article {
 
   @Column(name = "published_at")
   private Instant publishedAt;
+
+  @Column(name = "origin")
+  @Enumerated(EnumType.STRING)
+  private ArticleOrigin origin;
+
+  @Size(max = 1000)
+  @Column(name = "original_url", length = 1000)
+  private String originalUrl;
+
+  @Size(max = 255)
+  @Column(name = "source_name")
+  private String sourceName;
+
+  @Size(max = 255)
+  @Column(name = "external_id", unique = true)
+  private String externalId;
   
   @OneToMany(mappedBy = "article")
   private Set<Comment> comments = new LinkedHashSet<>();
