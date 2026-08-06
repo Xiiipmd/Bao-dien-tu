@@ -30,6 +30,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
 
 import com.google.genai.Client;
@@ -116,8 +118,7 @@ public class ArticleService {
                 break;
             }
             catch (Exception e) {
-                e.printStackTrace();
-                continue;
+                log.warn("Gemini model {} failed: {}", model, e.getMessage());
             }
         }
         if (chatResponse.equals("")) {
@@ -271,23 +272,49 @@ public class ArticleService {
             .build();
     }
 
-            @Transactional(readOnly = true)
-            public List<ArticleSearchResponse> searchArticles(
+    @Transactional(readOnly = true)
+    public List<ArticleSearchResponse> searchArticles(
                 String keyword,
                 Integer categoryId,
                 Integer authorId,
-                String authorName
+                String authorName,
+                String sourceName,
+                ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin
             ) {
             return articleRepo.searchPublishedArticles(
                 ArticleStatus.PUBLISHED,
                 normalizeQueryParam(keyword),
                 categoryId,
                 authorId,
-                normalizeQueryParam(authorName)
+                normalizeQueryParam(authorName),
+                normalizeQueryParam(sourceName),
+                origin
                 )
                 .stream()
                 .map(this::toSearchResponse)
                 .toList();
+            }
+
+            @Transactional(readOnly = true)
+            public Page<ArticleSearchResponse> searchArticlesPage(
+                String keyword,
+                Integer categoryId,
+                Integer authorId,
+                String authorName,
+                String sourceName,
+                ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin,
+                Pageable pageable
+            ) {
+                return articleRepo.searchPublishedArticlesPage(
+                    ArticleStatus.PUBLISHED,
+                    normalizeQueryParam(keyword),
+                    categoryId,
+                    authorId,
+                    normalizeQueryParam(authorName),
+                    normalizeQueryParam(sourceName),
+                    origin,
+                    pageable
+                ).map(this::toSearchResponse);
             }
 
     @Transactional(readOnly = true)
@@ -636,6 +663,9 @@ public class ArticleService {
             .type(article.getType())
             .viewCount(article.getViewCount() != null ? article.getViewCount() : 0)
             .createdAt(effectivePublishedAt(article))
+            .origin(article.getOrigin())
+            .originalUrl(article.getOriginalUrl())
+            .sourceName(article.getSourceName() != null ? article.getSourceName() : "NewsDaily")
             .build();
     }
 

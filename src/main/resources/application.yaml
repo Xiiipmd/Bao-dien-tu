@@ -56,3 +56,17 @@ vnpay:
   curr-code: VND
   locale: vn
  
+news:
+  rss:
+    enabled: true
+    refresh-delay-ms: 900000
+    sources:
+      - name: VnExpress
+        url: https://vnexpress.net/rss/tin-moi-nhat.rss
+        defaultCategory: Tin mới nhất
+      - name: VnExpress
+        url: https://vnexpress.net/rss/so-hoa.rss
+        defaultCategory: Công nghệ
+      - name: VnExpress
+        url: https://vnexpress.net/rss/kinh-doanh.rss
+        defaultCategory: Kinh doanh

@@ -20,4 +20,7 @@ public class ArticleSearchResponse {
   private ArticleType type;
   private Integer viewCount;
   private Instant createdAt;
+  private ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin;
+  private String originalUrl;
+  private String sourceName;
 }

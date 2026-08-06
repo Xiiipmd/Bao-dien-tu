@@ -41,6 +41,10 @@ public class ArticleDTO {
 	private String rejectionReason;
 	private Integer viewCount;
 	private Instant createdAt;
+	private ptit.tmdt.lop6nhom7.baodientu.enums.ArticleOrigin origin;
+	private String originalUrl;
+	private String sourceName;
+	private String externalId;
 
 	public Article toArticle() {
 		Article article = new Article();
@@ -64,6 +68,10 @@ public class ArticleDTO {
 		article.setRejectionReason(rejectionReason);
 		article.setViewCount(viewCount);
 		article.setCreatedAt(createdAt);
+		article.setOrigin(origin);
+		article.setOriginalUrl(originalUrl);
+		article.setSourceName(sourceName);
+		article.setExternalId(externalId);
 		return article;
 	}
 
