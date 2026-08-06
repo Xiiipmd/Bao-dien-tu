@@ -14,6 +14,17 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
+import java.util.Map;
+import java.util.function.Function;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.util.ArrayList;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,6 +33,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.data.domain.PageRequest;
 
 import com.google.genai.Client;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +42,7 @@ import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticlePreviewResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleReadResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleSearchResponse;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleTranslationResponse;
 import ptit.tmdt.lop6nhom7.baodientu.entity.Article;
 import ptit.tmdt.lop6nhom7.baodientu.entity.ArticleView;
 import ptit.tmdt.lop6nhom7.baodientu.entity.User;
@@ -51,12 +65,18 @@ public class ArticleService {
     private static final int PREVIEW_CHARACTER_LIMIT = 700;
     private static final int MONTHLY_FREE_VIP_ARTICLE_LIMIT = 3;
     private static final int HOME_ARTICLE_LIMIT = 12;
+    private static final int TRENDING_ARTICLE_LIMIT = 3;
+    private static final int TRENDING_PERIOD_DAYS = 3;
     
     private final ArticleRepo articleRepo;
     private final ArticleViewRepo articleViewRepo;
     private final UserRepo userRepo;
     private final AnonymousReadMeterService anonymousReadMeterService;
     private final NewsNotificationService newsNotificationService;
+    private final ObjectMapper objectMapper;
+    private final HttpClient translationHttpClient = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .build();
     private final List<String> geminiModels = List.of(
         "gemini-3.1-pro-preview",
         "gemini-2.5-pro",
@@ -112,6 +132,113 @@ public class ArticleService {
             .content(chatResponse)
             .type(ArticleType.FREE)
             .build();
+    }
+
+    public ArticleTranslationResponse translateArticleToEnglish(String articleText) throws Exception {
+        String prompt = """
+            Translate the Vietnamese news article below into natural, accurate English for text-to-speech.
+
+            Requirements:
+            - Translate every part of the supplied text without summarizing or adding information.
+            - Preserve names, numbers, dates, quotations, and paragraph order.
+            - Return plain English text only. Do not add a title, explanation, Markdown, or code fences.
+
+            <article>
+            %s
+            </article>
+            """.formatted(articleText);
+
+        String geminiApiKey = System.getenv("GEMINI_API_KEY");
+        if (geminiApiKey != null && !geminiApiKey.isBlank() && !geminiApiKey.startsWith("dummy-")) {
+            Client geminiClient = new Client();
+            for (String model : geminiModels) {
+                try {
+                    String translatedText = geminiClient.models.generateContent(model, prompt, null).text();
+                    if (translatedText != null && !translatedText.isBlank()) {
+                        return new ArticleTranslationResponse(translatedText.trim(), "en");
+                    }
+                } catch (Exception exception) {
+                    log.warn("Gemini translation failed with model {}: {}", model, exception.getMessage());
+                }
+            }
+        }
+
+        try {
+            return new ArticleTranslationResponse(translateWithMyMemory(articleText), "en");
+        } catch (Exception exception) {
+            log.error("Fallback translation failed", exception);
+            throw new BadRequestException(
+                "Không thể dịch bài báo. Hãy cấu hình GEMINI_API_KEY hợp lệ hoặc kiểm tra kết nối Internet của backend"
+            );
+        }
+    }
+
+    private String translateWithMyMemory(String articleText) throws Exception {
+        List<String> chunks = splitByUtf8Bytes(articleText, 450);
+        StringBuilder translation = new StringBuilder();
+
+        for (String chunk : chunks) {
+            String encodedText = URLEncoder.encode(chunk, StandardCharsets.UTF_8);
+            URI uri = URI.create(
+                "https://api.mymemory.translated.net/get?q=" + encodedText + "&langpair=vi%7Cen&mt=1"
+            );
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                .timeout(Duration.ofSeconds(20))
+                .header("Accept", "application/json")
+                .header("User-Agent", "TMDT-NewsReader/1.0")
+                .GET()
+                .build();
+            HttpResponse<String> response = translationHttpClient.send(
+                request,
+                HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8)
+            );
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("Translation provider returned HTTP " + response.statusCode());
+            }
+
+            JsonNode root = objectMapper.readTree(response.body());
+            if (root.path("responseStatus").asInt(200) != 200) {
+                throw new IllegalStateException(root.path("responseDetails").asText("Translation provider rejected request"));
+            }
+            String translatedChunk = root.path("responseData").path("translatedText").asText("").trim();
+            if (translatedChunk.isBlank()) {
+                throw new IllegalStateException("Translation provider returned empty text");
+            }
+            if (!translation.isEmpty()) translation.append(' ');
+            translation.append(decodeBasicHtmlEntities(translatedChunk));
+        }
+
+        return translation.toString();
+    }
+
+    private List<String> splitByUtf8Bytes(String text, int maxBytes) {
+        List<String> chunks = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+
+        for (String word : text.trim().split("\\s+")) {
+            String candidate = current.isEmpty() ? word : current + " " + word;
+            if (candidate.getBytes(StandardCharsets.UTF_8).length <= maxBytes) {
+                current.setLength(0);
+                current.append(candidate);
+                continue;
+            }
+            if (!current.isEmpty()) {
+                chunks.add(current.toString());
+                current.setLength(0);
+            }
+            current.append(word);
+        }
+        if (!current.isEmpty()) chunks.add(current.toString());
+        return chunks;
+    }
+
+    private String decodeBasicHtmlEntities(String value) {
+        return value
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&");
     }
 
     @Transactional(readOnly = true)
@@ -223,6 +350,34 @@ public class ArticleService {
             ));
         }
         return preferred.stream().map(this::toSearchResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ArticleSearchResponse> getTrendingArticles() {
+        Instant endDate = Instant.now();
+        Instant startDate = endDate.minus(TRENDING_PERIOD_DAYS, ChronoUnit.DAYS);
+        List<Integer> rankedIds = articleViewRepo.findTrendingArticles(
+                ArticleStatus.PUBLISHED.name(),
+                startDate,
+                endDate,
+                PageRequest.of(0, TRENDING_ARTICLE_LIMIT)
+            )
+            .stream()
+            .map(ArticleViewRepo.TrendingArticleView::getArticleId)
+            .toList();
+
+        if (rankedIds.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, Article> articlesById = articleRepo.findByIdIn(rankedIds).stream()
+            .collect(Collectors.toMap(Article::getId, Function.identity()));
+
+        return rankedIds.stream()
+            .map(articlesById::get)
+            .filter(java.util.Objects::nonNull)
+            .map(this::toSearchResponse)
+            .toList();
     }
 
     @Transactional
