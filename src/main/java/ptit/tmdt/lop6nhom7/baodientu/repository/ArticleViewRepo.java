@@ -191,11 +191,13 @@ public interface ArticleViewRepo extends JpaRepository<ArticleView, Integer> {
             join articles a on a.id = av.article_id
             join users u on u.id = a.author_id
             where a.status = :status
+                and u.role = :authorRole
                 and av.viewed_at between :startDate and :endDate
             group by u.id, u.full_name
             """, nativeQuery = true)
     List<AdminTopStat> findTopAuthorsForAdmin(
             @Param("status") String status,
+            @Param("authorRole") String authorRole,
             @Param("startDate") Instant startDate,
             @Param("endDate") Instant endDate,
             @Param("freeRate") Long freeRate,

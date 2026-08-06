@@ -247,6 +247,7 @@ public class StatService {
         List<ArticleViewRepo.AdminTopStat> rows = target == AdminTopTarget.AUTHOR
                 ? articleViewRepo.findTopAuthorsForAdmin(
                         ArticleStatus.PUBLISHED.name(),
+                        UserRole.AUTHOR.name(),
                         startInstant,
                         endInstant,
                         FREE_REVENUE_PER_VIEW,

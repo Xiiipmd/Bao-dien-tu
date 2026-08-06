@@ -11,6 +11,10 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import jakarta.validation.Valid;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +22,8 @@ import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleDTO;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticlePreviewResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleReadResponse;
 import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleSearchResponse;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleTranslationRequest;
+import ptit.tmdt.lop6nhom7.baodientu.dto.ArticleTranslationResponse;
 import ptit.tmdt.lop6nhom7.baodientu.service.AnonymousReadMeterService;
 import ptit.tmdt.lop6nhom7.baodientu.service.ArticleService;
 
@@ -79,6 +85,13 @@ public class ArticleController {
     @PreAuthorize("hasAnyRole('VIP', 'ADMIN')")
     public ResponseEntity<ArticleDTO> getAIArticleSummary(@RequestParam("articleId") int articleId) throws Exception {
         return ResponseEntity.ok(articleService.summarizeArticle(articleId));
+    }
+
+    @PostMapping("/translate/en")
+    public ResponseEntity<ArticleTranslationResponse> translateArticleToEnglish(
+        @Valid @RequestBody ArticleTranslationRequest request
+    ) throws Exception {
+        return ResponseEntity.ok(articleService.translateArticleToEnglish(request.text()));
     }
 
     private String resolveReaderKey(HttpServletRequest request, HttpServletResponse response) {
