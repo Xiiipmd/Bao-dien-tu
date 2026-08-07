@@ -21,6 +21,7 @@ import ptit.tmdt.lop6nhom7.baodientu.repository.UserRepo;
 import ptit.tmdt.lop6nhom7.baodientu.security.JwtService;
 
 import java.time.Instant;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -37,14 +38,14 @@ public class AuthService {
 
     // Find user
     User u = userRepo.findByEmail(email)
-        .orElseThrow(() -> new UnauthorizedException("Sai ten dang nhap hoac mat khau"));
+        .orElseThrow(() -> new UnauthorizedException("Sai tên đăng nhập hoặc mật khẩu"));
     // Check status
     if (u.getStatus() == UserStatus.LOCKED) {
-      throw new ForbiddenException("Nguoi dung bi khoa tai khoan");
+      throw new ForbiddenException("Tài khoản người dùng đã bị khóa");
     }
     // Verify password
     if (!passwordEncoder.matches(password, u.getPasswordHash())) {
-      throw new UnauthorizedException("Sai ten dang nhap hoac mat khau");
+      throw new UnauthorizedException("Sai tên đăng nhập hoặc mật khẩu");
     }
     // Generate JWT
     String jwtToken = jwtService.generateToken(u);
@@ -80,19 +81,26 @@ public class AuthService {
     User newUser = new User();
     newUser.setEmail(email);
     newUser.setFullName(name);
-    newUser.setStatus(UserStatus.ACTIVE);
     newUser.setPasswordHash(passwordEncoder.encode(password));
     newUser.setRole(requestedRole);
+    newUser.setStatus(UserStatus.ACTIVE);
     newUser.setFreeArticlesLeft(3);
-    newUser.setVipExpiryDate(Instant.now());
-    newUser.setCreatedAt(Instant.now());
+    newUser.setVipExpiryDate(null);
     userRepo.save(newUser);
   }
 
-  private UserRole parseSelfRegisterRole(String rawRole) {
-    if (rawRole == null || rawRole.isBlank() || "MEMBER".equalsIgnoreCase(rawRole.trim())) {
+  private UserRole parseSelfRegisterRole(String roleStr) {
+    if (roleStr == null) {
       return UserRole.MEMBER;
     }
-    throw new ConflictException("Tai khoan tac gia phai duoc quan tri vien cap quyen");
+    try {
+      UserRole parsed = UserRole.valueOf(roleStr.toUpperCase().trim());
+      if (parsed == UserRole.AUTHOR || parsed == UserRole.CENSOR || parsed == UserRole.ADMIN) {
+        return UserRole.MEMBER;
+      }
+      return parsed;
+    } catch (IllegalArgumentException ex) {
+      return UserRole.MEMBER;
+    }
   }
 }
