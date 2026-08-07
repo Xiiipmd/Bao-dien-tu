@@ -60,6 +60,15 @@ public class ArticleCommentService {
         .userName(comment.getUser().getFullName())
         .content(comment.getContent())
         .createdAt(comment.getCreatedAt())
+        .user(ArticleCommentResponse.CommentUserDto.builder()
+            .id(comment.getUser().getId())
+            .displayName(comment.getUser().getFullName())
+            .avatarUrl(comment.getUser().getAvatarUrl())
+            .build())
+        .article(ArticleCommentResponse.CommentArticleDto.builder()
+            .id(comment.getArticle().getId())
+            .title(comment.getArticle().getTitle())
+            .build())
         .build();
   }
 }

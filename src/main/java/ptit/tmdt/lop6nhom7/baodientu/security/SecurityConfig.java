@@ -44,6 +44,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/categories").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/articles/*/comments").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/*/public-profile").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/users/*/comments").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/utilities/**").permitAll()
                         .requestMatchers("/api/vip-packages/**").permitAll()
                         .requestMatchers("/api/transactions/vnpay-return").permitAll()
