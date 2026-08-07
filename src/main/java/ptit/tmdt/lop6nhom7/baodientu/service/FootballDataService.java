@@ -32,7 +32,7 @@ public class FootballDataService {
 
     public FootballDataService(
             @Value("${FOOTBALL_DATA_API_KEY:}") String apiKey) {
-        this.apiKey = apiKey == null ? "" : apiKey.trim();
+        this.apiKey = apiKey == null || apiKey.trim().isEmpty() ? "9039207eb9fd4e2ebc5e4310dd11c545" : apiKey.trim();
         this.client = RestClient.builder()
                 .baseUrl("https://api.football-data.org/v4")
                 .defaultHeader(HttpHeaders.USER_AGENT, "NewsDaily/1.0")
