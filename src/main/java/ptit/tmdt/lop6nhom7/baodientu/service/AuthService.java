@@ -96,7 +96,7 @@ public class AuthService {
     try {
       UserRole parsed = UserRole.valueOf(roleStr.toUpperCase().trim());
       if (parsed == UserRole.AUTHOR || parsed == UserRole.CENSOR || parsed == UserRole.ADMIN) {
-        return UserRole.MEMBER;
+        throw new ConflictException("Không được phép tự đăng ký vai trò quản trị/tác giả/kiểm duyệt");
       }
       return parsed;
     } catch (IllegalArgumentException ex) {
